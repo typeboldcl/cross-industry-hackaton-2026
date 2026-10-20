@@ -71,6 +71,7 @@ h2{font-size:20px;margin:4px 0 2px}
 h3{font-size:16px;margin:0}
 .sec-title{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:18px 2px 8px;font-weight:650}
 .btn{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+a.btn{text-decoration:none;color:var(--text)}
 .btn.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
 .btn.ghost{background:transparent;border-color:transparent;color:var(--primary);padding:8px}
 .btn.block{width:100%}
@@ -190,6 +191,14 @@ textarea{min-height:80px;resize:vertical}
 .chat-in{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border)}
 .sugs{display:flex;gap:6px;overflow-x:auto;padding:0 12px 10px}
 .sugs button{white-space:nowrap}
+.crumb{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.crumb:hover{color:var(--primary)}
+a.select-card:hover{border-color:var(--primary)}
+.locked{display:flex;align-items:center;gap:10px;margin-top:4px;padding:8px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);color:var(--muted)}
+.locked b{color:var(--text)}
+.dialog{background:var(--surface);color:var(--text);border-radius:18px;padding:20px;width:calc(100% - 32px);max-width:400px;margin:auto;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.sheet-bg:has(.dialog){align-items:center}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
 .toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:60;font-size:14px;max-width:90vw;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 .empty{text-align:center;padding:30px 10px;color:var(--muted)}
 .hide{display:none!important}
@@ -291,23 +300,32 @@ const REQ_TEMPLATES = [
 /* =========================================================================
    ESTADO (persistido en el teléfono para trabajar sin conexión)
    ========================================================================= */
-const KEY = 'auditorias-proto-v1';
+const KEY = 'auditorias-proto-v2';
 const ESTADOS = { cumple:'Cumple', parcial:'Parcial', no_cumple:'No cumple', na:'No aplica', pendiente:'Pendiente' };
+const TIPOS_AUDITORIA = ['Interna','Seguimiento de hallazgos','Externa / certificación','Simulacro de fiscalización SMA'];
+const STATUS = {
+  sin_preparar:{ label:'Borrador', cls:'', accion:'Continuar preparación', ruta:'preparar' },
+  en_validacion:{ label:'En validación', cls:'warn', accion:'Validar requisitos', ruta:'preparar' },
+  publicada:{ label:'En terreno', cls:'info', accion:'Continuar en terreno', ruta:'terreno' },
+  cerrada:{ label:'Cerrada', cls:'ok', accion:'Ver resultados', ruta:'panel' },
+};
 
-function freshState(){
-  return {
-    inst:'aucha', step:1,
-    docs: DOCS_AUCHA.map(d=>({...d})),
-    perts: PERT_AUCHA.map(p=>({...p})),
-    extras: [],
-    audit:{ status:'sin_preparar', nombre:'Auditoría interna Q4 2026', validador:'', publicada:null },
-    reqs:[], temasOff:[], editing:null,
-    tab:'pend', q:'', pending:0, chat:[]
-  };
+// S = estado de la app; cada centro puede tener varias auditorías (S.audits).
+// A = auditoría abierta actualmente (S.cur).
+function freshState(){ return { centro:null, cur:null, audits:[], seq:0, tab:'pend', q:'', pending:0, chat:[], editing:null, adding:false }; }
+function newAudit({inst, nombre, tipo, fecha}){
+  S.seq = (S.seq||0) + 1;
+  const real = inst==='aucha';
+  return { id:'A'+S.seq+'-'+Date.now().toString(36).slice(-4), inst, nombre, tipo, fecha, creada:nowISO(), step:2,
+    docs: real ? DOCS_AUCHA.map(d=>({...d})) : [], perts: real ? PERT_AUCHA.map(p=>({...p})) : [], extras:[],
+    status:'sin_preparar', generado:false, validador:'', publicada:null, cerrada:null, reqs:[], temasOff:[] };
 }
-let S;
-function load(){ try{ const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : freshState(); }catch(e){ S = freshState(); } }
+let S, A = null;
+function syncA(){ A = (S.audits||[]).find(a=>a.id===S.cur) || null; }
+function load(){ try{ const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : freshState(); }catch(e){ S = freshState(); } if(!Array.isArray(S.audits)) S = freshState(); syncA(); }
 function save(markPending){ if(markPending){ S.pending++; scheduleSync(); } try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+const instById = id => INSTALACIONES.find(i=>i.id===id);
+const auditsOf = inst => S.audits.filter(a=>a.inst===inst).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
 
 /* =========================================================================
    UTILIDADES
@@ -317,8 +335,12 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;'
 const fmtDate = iso => { if(!iso) return '—'; const [y,m,d] = iso.slice(0,10).split('-'); return `${d}-${m}-${y}`; };
 const nowISO = () => new Date().toISOString();
 const daysTo = iso => Math.ceil((new Date(iso+'T23:59:59') - new Date())/86400000);
-const docById = id => id==='MANUAL' ? {numero:'', tipo:'Criterio del responsable'} : (S.docs.find(d=>d.id===id) || S.extras.find(d=>d.id===id) || S.perts.find(d=>d.id===id) || {numero:id, tipo:''});
-const activeReqs = () => S.reqs.filter(r=>r.val==='validado');
+function docById(id, a=A){
+  if(id==='MANUAL') return {numero:'', tipo:'Criterio del responsable'};
+  const src = a || {docs:DOCS_AUCHA, extras:[], perts:PERT_AUCHA};
+  return src.docs.find(d=>d.id===id) || src.extras.find(d=>d.id===id) || src.perts.find(d=>d.id===id) || {numero:id, tipo:''};
+}
+const activeReqs = (a=A) => a ? a.reqs.filter(r=>r.val==='validado') : [];
 function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
 function dueTag(iso){ if(!iso) return ''; const d=daysTo(iso); const cls = d<0?'bad':d<=14?'warn':'info'; const txt = d<0?`Vencido hace ${-d} d`:d===0?'Vence hoy':`Vence en ${d} d`; return `<span class="tag ${cls}">${txt}</span>`; }
 
@@ -371,35 +393,100 @@ function route(){ return (location.hash.replace(/^#\/?/,'') || 'inicio').split('
 
 function renderNav(){
   const [r] = route();
-  const items = [['inicio','Inicio','home'],['preparar','Preparar','prep'],['terreno','Terreno','field'],['panel','Panel','panel']];
-  $('#nav').innerHTML = items.map(([id,l,ic])=>`<a href="#/${id}" class="${(r===id||(r==='req'&&id==='terreno'))?'on':''}">${icon(ic)}<span>${l}</span></a>`).join('');
+  const items = [['inicio','Centros','home'],['preparar','Preparar','prep'],['terreno','Terreno','field'],['panel','Panel','panel']];
+  const on = id => r===id || (id==='terreno' && r==='req') || (id==='inicio' && (r==='centro'||r==='nueva'));
+  $('#nav').innerHTML = items.map(([id,l,ic])=>`<a href="#/${id}" class="${on(id)?'on':''}">${icon(ic)}<span>${l}</span></a>`).join('');
+}
+const INST_ICON = {aucha:'fish', ces:'boat', planta:'factory'};
+
+// Resumen de un centro: última auditoría con requisitos (o datos ficticios si no hay).
+function instSummary(i){
+  const list = auditsOf(i.id);
+  const conReqs = list.find(a=>activeReqs(a).length);
+  if(conReqs){ const s = stats(activeReqs(conReqs)); return {pct:s.pct, avance:s.avance, nc:s.no_cumple, total:s.total, audit:conReqs, n:list.length}; }
+  if(i.demo) return {...i.demo, n:list.length, ficticio:true};
+  return {pct:null, avance:0, nc:0, total:0, n:list.length};
 }
 
+/* ---------- 1. Selección de centro ---------- */
 function viewInicio(){
-  const st = stats(activeReqs());
-  const pub = S.audit.status==='publicada';
   return `<div class="stack">
     <div class="hero">
-      <h2>Auditoría de cumplimiento ambiental</h2>
-      <p>Requisitos generados desde la RCA y las resoluciones de cada instalación, validados por un responsable y llenados en terreno con evidencias.</p>
+      <h2>¿Qué centro vas a auditar?</h2>
+      <p>Elige la instalación para ver sus auditorías o crear una nueva.</p>
     </div>
-    <div class="card">
-      <div class="row"><div class="grow"><h3>${esc(S.audit.nombre)}</h3><div class="small muted">Piscicultura Aucha · ${pub?`publicada el ${fmtDate(S.audit.publicada)}`:S.audit.status==='en_validacion'?'requisitos en validación':'sin preparar'}</div></div>
-      <span class="tag ${pub?'ok':S.audit.status==='en_validacion'?'warn':''}">${pub?'En terreno':S.audit.status==='en_validacion'?'En validación':'Borrador'}</span></div>
-      ${pub?`<div style="margin-top:12px">${progressBar(st)}</div><div class="small muted" style="margin-top:6px">${st.llenos} de ${st.total} requisitos llenados · ${st.pct==null?'sin evaluar':st.pct+'% de cumplimiento'}</div>`:''}
-    </div>
-    <div class="sec-title">Flujo de trabajo</div>
-    <div class="tiles">
-      <a class="tile" href="#/preparar"><div class="n">1</div><b>Antes de ir al lugar</b><span class="small muted">Elige el centro, carga la RCA y las pertinencias, genera y valida los requisitos.</span></a>
-      <a class="tile" href="#/terreno"><div class="n">2</div><b>Trabajo en terreno</b><span class="small muted">Checklist con semáforo y evidencias. Funciona sin conexión.</span></a>
-      <a class="tile" href="#/panel"><div class="n">3</div><b>Panel de cumplimiento</b><span class="small muted">Estado por instalación, vencimientos y hallazgos.</span></a>
-    </div>
-    ${S.audit.status==='sin_preparar'?`<div class="card row wrap"><div class="grow small"><b>¿Presentando?</b><br><span class="muted">Carga una auditoría de ejemplo ya validada y con avance para ir directo a terreno y al panel.</span></div><button class="btn sm" data-action="demo">Cargar ejemplo</button></div>`:''}
-    <div class="sec-title">Alertas detectadas en los documentos</div>
-    ${ALERTAS.map(alertHTML).join('')}
-    <div class="row" style="justify-content:center;margin-top:18px"><button class="btn ghost small" data-action="reset">Reiniciar prototipo</button></div>
+    ${INSTALACIONES.map(i=>{
+      const s = instSummary(i), enCurso = auditsOf(i.id).filter(a=>a.status!=='cerrada').length;
+      return `<a class="select-card" href="#/centro/${i.id}" style="text-decoration:none;color:inherit">
+        ${ring(s.pct, pctColor(s.pct))}
+        <span class="grow"><b>${esc(i.nombre)}</b><br><span class="small muted">${esc(i.tipo)} · ${esc(i.lugar)}</span>
+        <br><span class="xs">${s.n ? `${s.n} auditoría${s.n>1?'s':''}${enCurso?` · ${enCurso} en curso`:''}` : 'Sin auditorías'}${s.ficticio?' · datos ficticios':''}</span></span>
+        <span class="chev">${icon('chev',18)}</span></a>`;
+    }).join('')}
+    ${S.audits.length ? '' : `<div class="card row wrap"><div class="grow small"><b>¿Presentando?</b><br><span class="muted">Carga un ejemplo con dos auditorías de Aucha: una cerrada y otra en terreno.</span></div><button class="btn sm" data-action="demo">Cargar ejemplo</button></div>`}
+    <div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost small" data-action="reset">Reiniciar prototipo</button></div>
   </div>`;
 }
+
+/* ---------- 2. Auditorías del centro ---------- */
+function auditCard(a){
+  const st = stats(activeReqs(a)), info = STATUS[a.status];
+  const conAvance = a.status==='publicada' || a.status==='cerrada';
+  return `<div class="card">
+    <div class="row" style="align-items:flex-start"><div class="grow"><h3>${esc(a.nombre)}</h3>
+      <div class="small muted">${esc(a.tipo)} · ${fmtDate(a.fecha)}${a.validador?` · validó ${esc(a.validador)}`:''}</div></div>
+      <span class="tag ${info.cls}">${info.label}</span></div>
+    ${conAvance ? `<div style="margin-top:10px">${progressBar(st)}</div>
+      <div class="small muted" style="margin-top:6px">${st.llenos}/${st.total} llenados · ${st.pct==null?'sin evaluar':st.pct+'% cumplimiento'} · ${st.no_cumple} no cumple</div>`
+      : `<div class="small muted" style="margin-top:8px">${a.status==='en_validacion'?`${a.reqs.filter(r=>r.val!=='descartado').length} requisitos por validar`:'Falta cargar documentos y generar requisitos'}</div>`}
+    <div class="row" style="margin-top:12px;gap:8px">
+      <a class="btn primary sm grow" href="#/a/${a.id}">${info.accion}</a>
+      ${conAvance && a.status!=='cerrada' ? `<a class="btn sm" href="#/a/${a.id}/panel">Panel</a>` : ''}
+    </div></div>`;
+}
+function viewCentro(id){
+  const i = instById(id); if(!i) return viewInicio();
+  const list = auditsOf(id), enCurso = list.filter(a=>a.status!=='cerrada'), cerradas = list.filter(a=>a.status==='cerrada');
+  return `<div class="stack">
+    <a href="#/inicio" class="crumb">${icon('back',16)} Centros</a>
+    <div class="row"><span class="ico">${icon(INST_ICON[id])}</span><div class="grow"><h2 style="margin:0">${esc(i.nombre)}</h2><div class="small muted">${esc(i.tipo)} · ${esc(i.lugar)}</div></div></div>
+    <a class="btn primary block" href="#/nueva" style="padding:14px;font-size:16px">+ Crear nueva auditoría</a>
+    ${!list.length ? `<div class="empty card">Este centro aún no tiene auditorías.<br>Crea la primera con el botón de arriba.</div>` : ''}
+    ${enCurso.length ? `<div class="sec-title">En curso · ${enCurso.length}</div>${enCurso.map(auditCard).join('')}` : ''}
+    ${cerradas.length ? `<div class="sec-title">Finalizadas · ${cerradas.length}</div>${cerradas.map(auditCard).join('')}` : ''}
+    ${i.real ? `<div class="sec-title">Documentos del centro</div>
+      <div class="card small">${DOCS_AUCHA.map(d=>`<div class="row" style="padding:4px 0"><span class="tag">${esc(d.tipo)}</span><span class="grow">${esc(d.numero)}</span><span class="tag ${d.estado}">${d.estado==='ok'?'Vigente':'Revisar'}</span></div>`).join('')}</div>
+      <div class="sec-title">Alertas detectadas en los documentos</div>${ALERTAS.map(alertHTML).join('')}` :
+      `<div class="alert info"><div>Este centro usa datos de ejemplo: no tiene documentos del reto. Puedes crear auditorías y agregar requisitos manualmente.</div></div>`}
+  </div>`;
+}
+
+/* ---------- 3. Crear nueva auditoría ---------- */
+function viewNueva(){
+  const inst = instById(S.centro);
+  if(!inst) return `<div class="empty card"><h3>Primero elige un centro</h3><p class="small">Las auditorías se crean dentro de un centro.</p><a class="btn primary" href="#/inicio">Elegir centro</a></div>`;
+  const centro = inst.id, hoy = new Date().toISOString().slice(0,10);
+  const mes = new Date().toLocaleDateString('es-CL',{month:'long', year:'numeric'});
+  return `<div class="stack">
+    <a href="#/centro/${centro}" class="crumb">${icon('back',16)} Volver</a>
+    <h2>Crear nueva auditoría</h2>
+    <div class="card stack">
+      <div class="small"><b>Centro</b>
+        <div class="locked" aria-readonly="true"><span class="ico" style="width:32px;height:32px">${icon(INST_ICON[centro],18)}</span>
+          <span class="grow"><b>${esc(inst.nombre)}</b><br><span class="xs muted">${esc(inst.tipo)}</span></span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Bloqueado"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <input type="hidden" id="nv-inst" value="${centro}"></div>
+      <label class="small"><b>Tipo de auditoría</b><select id="nv-tipo">${TIPOS_AUDITORIA.map(t=>`<option>${t}</option>`).join('')}</select></label>
+      <label class="small"><b>Nombre</b><input type="text" id="nv-nombre" value="Auditoría interna ${esc(mes)}"></label>
+      <label class="small"><b>Fecha programada</b><input type="date" id="nv-fecha" value="${hoy}"></label>
+    </div>
+    <div class="small muted">Después cargarás los documentos, generarás los requisitos y un responsable los validará.</div>
+    <div class="row"><a class="btn" href="#/centro/${centro}">Cancelar</a><button class="btn primary grow" data-action="create-audit">Crear y preparar</button></div>
+  </div>`;
+}
+
+function crumbHTML(){ return `<a href="#/centro/${A.inst}" class="crumb">${icon('back',16)} ${esc(instById(A.inst).nombre)} · auditorías</a>`; }
+function noAuditHTML(){ return `<div class="empty card"><h3>No hay una auditoría abierta</h3><p class="small">Elige un centro y luego crea o abre una auditoría.</p><a class="btn primary" href="#/inicio">Elegir centro</a></div>`; }
 function alertHTML(a){ return `<div class="alert ${a.tipo}" style="margin-bottom:8px"><div><b>${esc(a.titulo)}</b>${esc(a.texto)}</div></div>`; }
 
 function progressBar(st){
@@ -410,19 +497,22 @@ function progressBar(st){
 
 /* ---------- Preparar (wizard) ---------- */
 function viewPreparar(){
-  const steps = ['Centro','Documentos','Pertinencias','Requisitos'];
-  const head = `<h2>Preparar auditoría</h2><p class="muted small" style="margin:0 0 10px">Antes de ir al lugar</p>
-    <div class="steps">${steps.map((s,i)=>`<div class="step ${S.step===i+1?'on':S.step>i+1?'done':''}"><i></i>${i+1}. ${s}</div>`).join('')}</div>`;
-  return head + [null,prepCentro,prepDocs,prepPerts,prepReqs][S.step]();
+  if(!A) return noAuditHTML();
+  const steps = ['Datos','Documentos','Pertinencias','Requisitos'];
+  const head = `${crumbHTML()}<h2>Preparar auditoría</h2><p class="muted small" style="margin:0 0 10px">${esc(A.nombre)} · antes de ir al lugar</p>
+    <div class="steps">${steps.map((s,i)=>`<div class="step ${A.step===i+1?'on':A.step>i+1?'done':''}"><i></i>${i+1}. ${s}</div>`).join('')}</div>`;
+  return head + [null,prepDatos,prepDocs,prepPerts,prepReqs][A.step]();
 }
-function prepCentro(){
-  const ic = {aucha:'fish',ces:'boat',planta:'factory'};
+function prepDatos(){
+  const i = instById(A.inst);
   return `<div class="stack">
-    ${INSTALACIONES.map(i=>`<button class="select-card ${S.inst===i.id?'on':''}" data-action="pick-inst" data-id="${i.id}">
-      <span class="ico">${icon(ic[i.id])}</span><span class="grow"><b>${esc(i.nombre)}</b><br><span class="small muted">${esc(i.tipo)} · ${esc(i.lugar)}</span></span>
-      ${i.real?'<span class="tag ok">4 docs</span>':'<span class="tag">ejemplo</span>'}</button>`).join('')}
-    ${S.inst!=='aucha'?`<div class="alert info"><div>En este prototipo solo la Piscicultura Aucha tiene documentos reales del reto. Las otras instalaciones muestran datos ficticios en el panel.</div></div>`:''}
-    <div class="sticky-foot"><button class="btn primary block" data-action="step" data-n="2" ${S.inst!=='aucha'?'disabled':''}>Continuar</button></div>
+    <div class="card"><dl class="kv">
+      <dt>Centro</dt><dd>${esc(i.nombre)}</dd>
+      <dt>Tipo</dt><dd>${esc(A.tipo)}</dd>
+      <dt>Fecha</dt><dd>${fmtDate(A.fecha)}</dd>
+      <dt>Estado</dt><dd><span class="tag ${STATUS[A.status].cls}">${STATUS[A.status].label}</span></dd>
+    </dl></div>
+    <div class="sticky-foot"><button class="btn primary block" data-action="step" data-n="2">Continuar</button></div>
   </div>`;
 }
 function prepDocs(){
@@ -430,10 +520,10 @@ function prepDocs(){
     <div class="card">
       <h3>Documentos de la instalación</h3>
       <p class="small muted" style="margin:4px 0 12px">RCA, resoluciones sectoriales o normas. El sistema verifica vigencia y si fueron modificados.</p>
-      ${[...S.docs, ...S.extras].map(d=>`<div class="doc"><span class="ico">${icon('file')}</span><div class="grow">
+      ${[...A.docs, ...A.extras].map(d=>`<div class="doc"><span class="ico">${icon('file')}</span><div class="grow">
         <div class="row wrap" style="gap:6px"><span class="tag">${esc(d.tipo)}</span><span class="tag ${d.estado||'info'}">${esc(d.vigencia||'Por procesar')}</span></div>
         <div style="font-weight:600;margin-top:4px">${esc(d.numero)}</div>
-        <div class="small muted">${esc(d.titulo)}${d.fecha?` · ${fmtDate(d.fecha)}`:''}</div></div></div>`).join('')}
+        <div class="small muted">${esc(d.titulo)}${d.fecha?` · ${fmtDate(d.fecha)}`:''}</div></div></div>`).join('') || '<div class="small muted">Aún no hay documentos cargados para este centro.</div>'}
     </div>
     <label class="drop" for="file-doc">${icon('clip')}<br><b>Cargar documento</b><br><span class="small">PDF de RCA, resolución sectorial o norma</span></label>
     <div class="sticky-foot row"><button class="btn" data-action="step" data-n="1">Atrás</button><button class="btn primary grow" data-action="step" data-n="3">Continuar</button></div>
@@ -444,44 +534,45 @@ function prepPerts(){
     <div class="card">
       <h3>Pertinencias</h3>
       <p class="small muted" style="margin:4px 0 12px">Normas adicionales que el centro debe cumplir. Cada centro está asociado al SEIA, donde están sus pertinencias.</p>
-      ${S.perts.map(p=>`<div class="doc"><span class="ico">${icon('file')}</span><div class="grow">
+      ${A.perts.map(p=>`<div class="doc"><span class="ico">${icon('file')}</span><div class="grow">
         <div style="font-weight:600">${esc(p.numero)}</div><div class="small muted">${esc(p.titulo)} · citada en la RCA</div></div>
-        ${p.cargada?'<span class="tag ok">Cargada</span>':`<button class="btn sm" data-action="pert-load" data-id="${p.id}">Cargar</button>`}</div>`).join('')}
+        ${p.cargada?'<span class="tag ok">Cargada</span>':`<button class="btn sm" data-action="pert-load" data-id="${p.id}">Cargar</button>`}</div>`).join('') || '<div class="small muted">Sin pertinencias registradas.</div>'}
     </div>
     <label class="drop" for="file-pert">${icon('clip')}<br><b>Agregar otra pertinencia</b></label>
-    <div class="card"><h3>Normas citadas detectadas</h3><div class="row wrap" style="gap:6px;margin-top:10px">${NORMAS_CITADAS.map(n=>`<span class="chip">${esc(n)}</span>`).join('')}</div></div>
+    ${A.inst==='aucha'?`<div class="card"><h3>Normas citadas detectadas</h3><div class="row wrap" style="gap:6px;margin-top:10px">${NORMAS_CITADAS.map(n=>`<span class="chip">${esc(n)}</span>`).join('')}</div></div>`:''}
     <div class="sticky-foot row"><button class="btn" data-action="step" data-n="2">Atrás</button><button class="btn primary grow" data-action="step" data-n="4">Continuar</button></div>
   </div>`;
 }
 function prepReqs(){
-  if(!S.reqs.length){
+  if(!A.generado){
     return `<div class="stack"><div class="card">
       <h3>Generar listado de requisitos</h3>
-      <p class="small muted" style="margin:4px 0 12px">Se leerán ${S.docs.length + S.extras.length} documentos y ${S.perts.filter(p=>p.cargada).length} pertinencias para identificar las obligaciones aplicables.</p>
+      <p class="small muted" style="margin:4px 0 12px">Se leerán ${A.docs.length + A.extras.length} documentos y ${A.perts.filter(p=>p.cargada).length} pertinencias para identificar las obligaciones aplicables.</p>
       <div class="log" id="log"><span class="muted">Listo para procesar.</span></div>
     </div>
     <div class="sticky-foot row"><button class="btn" data-action="step" data-n="3">Atrás</button><button class="btn primary grow" data-action="generate" id="gen-btn">Generar requisitos</button></div></div>`;
   }
-  const temas = [...new Set(S.reqs.map(r=>r.tema))];
-  const sel = S.reqs.filter(r=>r.val!=='descartado' && !S.temasOff.includes(r.tema));
-  const published = S.audit.status==='publicada';
+  const temas = [...new Set(A.reqs.map(r=>r.tema))];
+  const sel = A.reqs.filter(r=>r.val!=='descartado' && !A.temasOff.includes(r.tema));
+  const published = A.status==='publicada' || A.status==='cerrada';
   return `<div class="stack">
+    ${!A.reqs.length?`<div class="alert warn"><div><b>No se detectaron requisitos</b>Los documentos de este centro no se pudieron procesar en el prototipo. Agrega los requisitos manualmente.</div></div>`:''}
     <div class="alert info"><div><b>Validación obligatoria</b>Los requisitos generados automáticamente deben ser revisados por un responsable antes de usarse en la auditoría.</div></div>
     <div class="card"><h3>Temáticas de la auditoría</h3><p class="small muted" style="margin:4px 0 10px">Elige qué temáticas forman parte de esta auditoría.</p>
-      <div class="row wrap" style="gap:6px">${temas.map(t=>`<button class="chip ${S.temasOff.includes(t)?'':'on'}" data-action="toggle-tema" data-t="${esc(t)}">${esc(t)} · ${S.reqs.filter(r=>r.tema===t&&r.val!=='descartado').length}</button>`).join('')}</div></div>
+      <div class="row wrap" style="gap:6px">${temas.map(t=>`<button class="chip ${A.temasOff.includes(t)?'':'on'}" data-action="toggle-tema" data-t="${esc(t)}">${esc(t)} · ${A.reqs.filter(r=>r.tema===t&&r.val!=='descartado').length}</button>`).join('')}</div></div>
     ${S.adding ? addFormHTML(temas) : `<button class="btn block" data-action="add-open">+ Agregar requisito que no detectó el análisis</button>`}
-    ${temas.filter(t=>!S.temasOff.includes(t)).map(t=>`<div><div class="sec-title">${esc(t)}</div>
-      ${S.reqs.filter(r=>r.tema===t).map(reqValHTML).join('')}</div>`).join('')}
+    ${temas.filter(t=>!A.temasOff.includes(t)).map(t=>`<div><div class="sec-title">${esc(t)}</div>
+      ${A.reqs.filter(r=>r.tema===t).map(reqValHTML).join('')}</div>`).join('')}
     <div class="card sticky-foot stack ${S.adding?'hide':''}">
-      ${published?`<div class="small"><b>Auditoría publicada</b> por ${esc(S.audit.validador)} el ${fmtDate(S.audit.publicada)}. Los cambios aquí se reflejan en terreno.</div>`:`
+      ${published?`<div class="small"><b>Auditoría publicada</b> por ${esc(A.validador)} el ${fmtDate(A.publicada)}. Los cambios aquí se reflejan en terreno.</div>`:`
       <label class="small" for="validador"><b>Responsable que valida</b></label>
-      <input type="text" id="validador" placeholder="Nombre y cargo" value="${esc(S.audit.validador)}">`}
-      <button class="btn primary block" data-action="publish" id="pub-btn" ${published||S.audit.validador.trim()?'':'disabled'}>${published?'Ir a terreno':`Validar y publicar (${sel.length} requisitos)`}</button>
+      <input type="text" id="validador" placeholder="Nombre y cargo" value="${esc(A.validador)}">`}
+      <button class="btn primary block" data-action="publish" id="pub-btn" ${published||(A.validador.trim()&&sel.length)?'':'disabled'}>${published?'Ir a terreno':`Validar y publicar (${sel.length} requisitos)`}</button>
     </div>
   </div>`;
 }
 function addFormHTML(temas){
-  const fuentes = [...S.docs, ...S.extras, ...S.perts.filter(p=>p.cargada)];
+  const fuentes = [...A.docs, ...A.extras, ...A.perts.filter(p=>p.cargada)];
   const frecs = ['Diaria','Semanal','Mensual','Trimestral','Semestral','Anual','Por evento','Verificación única'];
   return `<div class="card stack" id="add-form">
     <h3>Nuevo requisito</h3>
@@ -521,19 +612,23 @@ function reqValHTML(r){
 
 /* ---------- Terreno ---------- */
 function viewTerreno(){
-  if(S.audit.status!=='publicada'){
-    return `<div class="empty card"><h3>No hay auditoría publicada</h3><p class="small">Primero prepara la auditoría: carga los documentos, genera los requisitos y valídalos.</p>
-      <a class="btn primary" href="#/preparar">Preparar auditoría</a><div style="margin-top:10px"><button class="btn ghost sm" data-action="demo">o cargar ejemplo</button></div></div>`;
+  if(!A) return noAuditHTML();
+  const closed = A.status==='cerrada';
+  if(A.status!=='publicada' && !closed){
+    return `${crumbHTML()}<div class="empty card"><h3>Esta auditoría aún no está publicada</h3><p class="small">Primero prepárala: carga los documentos, genera los requisitos y valídalos.</p>
+      <a class="btn primary" href="#/preparar">Preparar auditoría</a></div>`;
   }
   const st = stats(activeReqs());
   return `<div class="stack">
-    <div><h2>Trabajo en terreno</h2><div class="small muted">Piscicultura Aucha · ${esc(S.audit.nombre)}</div></div>
+    ${crumbHTML()}
+    <div><h2>Trabajo en terreno</h2><div class="small muted">${esc(instById(A.inst).nombre)} · ${esc(A.nombre)}</div></div>
+    ${closed?`<div class="alert info"><div><b>Auditoría cerrada el ${fmtDate(A.cerrada)}</b>Solo lectura: puedes revisar los resultados y evidencias.</div></div>`:''}
     <div class="card">${progressBar(st)}<div class="row small" style="margin-top:8px"><span class="grow muted">${st.llenos}/${st.total} llenados</span><span><b>${st.pct==null?'—':st.pct+'%'}</b> cumplimiento</span></div>
       <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple ${st.cumple}</span><span><i style="background:var(--warn)"></i>Parcial ${st.parcial}</span><span><i style="background:var(--bad)"></i>No cumple ${st.no_cumple}</span><span><i style="background:var(--na)"></i>N/A ${st.na}</span></div></div>
     <input type="search" id="q" placeholder="Buscar requisito, tema o documento…" value="${esc(S.q)}" aria-label="Buscador">
     <div class="tabs"><button class="${S.tab==='pend'?'on':''}" data-action="tab" data-t="pend">Pendientes · ${st.pendiente}</button><button class="${S.tab==='done'?'on':''}" data-action="tab" data-t="done">Llenados · ${st.llenos}</button></div>
     <div id="list">${listHTML()}</div>
-    <button class="btn block" data-action="add-from-field">+ Agregar requisito encontrado en terreno</button>
+    ${closed?'':`<button class="btn block" data-action="add-from-field">+ Agregar requisito encontrado en terreno</button>`}
   </div>`;
 }
 function listHTML(){
@@ -554,30 +649,31 @@ function listHTML(){
 
 /* ---------- Detalle de requisito ---------- */
 function viewReq(id){
-  const r = S.reqs.find(x=>x.id===id);
+  if(!A) return noAuditHTML();
+  const r = A.reqs.find(x=>x.id===id);
   if(!r) return `<div class="empty">Requisito no encontrado.</div>`;
-  const d = docById(r.fuente.doc);
+  const d = docById(r.fuente.doc), ro = A.status==='cerrada' ? 'disabled' : '';
   return `<div class="stack">
     <a href="#/terreno" class="btn ghost" style="padding-left:0">${icon('back',18)} Volver al checklist</a>
     <div><span class="tag">${esc(r.tema)}</span><h2 style="margin-top:6px">${esc(r.titulo)}</h2><p style="margin:4px 0 0">${esc(r.detalle)}</p></div>
     ${r.rectificado?`<div class="alert warn"><div><b>Actualizado por rectificación</b>${esc(r.rectificado)}</div></div>`:''}
     <div class="sec-title">¿Cumple?</div>
-    <div class="status-grid">${['cumple','parcial','no_cumple','na'].map(k=>`<button class="st ${k} ${r.estado===k?'on':''}" data-action="set-estado" data-id="${r.id}" data-k="${k}"><span class="dot ${k}"></span>${ESTADOS[k]}</button>`).join('')}</div>
+    <div class="status-grid">${['cumple','parcial','no_cumple','na'].map(k=>`<button class="st ${k} ${r.estado===k?'on':''}" data-action="set-estado" data-id="${r.id}" data-k="${k}" ${ro}><span class="dot ${k}"></span>${ESTADOS[k]}</button>`).join('')}</div>
     <label class="sec-title" for="obs" style="display:block">Observación</label>
-    <textarea id="obs" data-id="${r.id}" placeholder="Describe lo observado en terreno…">${esc(r.obs||'')}</textarea>
+    <textarea id="obs" data-id="${r.id}" ${ro} placeholder="Describe lo observado en terreno…">${esc(r.obs||'')}</textarea>
     <div class="sec-title">Evidencias</div>
     <div class="small muted" style="margin:-4px 2px 8px">Esperada: ${esc(r.evidencia)}</div>
     <div class="stack">${r.evidencias.map((e,i)=>`<div class="ev">${e.thumb?`<img src="${e.thumb}" alt="">`:`<span class="ph">${esc((e.nombre.split('.').pop()||'DOC').toUpperCase().slice(0,4))}</span>`}
       <div class="grow small"><b>${esc(e.nombre)}</b><br><span class="muted">${fmtDate(e.fecha)} · ${e.sync?'sincronizada':'guardada en el teléfono'}</span></div>
-      <button class="btn ghost sm" data-action="ev-del" data-id="${r.id}" data-i="${i}" aria-label="Quitar">${icon('x',16)}</button></div>`).join('') || '<div class="small muted">Sin evidencias aún.</div>'}</div>
-    <div class="row"><button class="btn grow" data-action="ev-photo" data-id="${r.id}">${icon('cam',18)} Tomar foto</button><button class="btn grow" data-action="ev-file" data-id="${r.id}">${icon('clip',18)} Adjuntar</button></div>
+      ${ro?'':`<button class="btn ghost sm" data-action="ev-del" data-id="${r.id}" data-i="${i}" aria-label="Quitar">${icon('x',16)}</button>`}</div>`).join('') || '<div class="small muted">Sin evidencias aún.</div>'}</div>
+    ${ro?'':`<div class="row"><button class="btn grow" data-action="ev-photo" data-id="${r.id}">${icon('cam',18)} Tomar foto</button><button class="btn grow" data-action="ev-file" data-id="${r.id}">${icon('clip',18)} Adjuntar</button></div>`}
     <div class="sec-title">Información del requisito</div>
     <div class="card"><dl class="kv">
       <dt>Fuente</dt><dd>${esc(d.tipo)} ${esc(d.numero)}</dd>
       <dt>Referencia</dt><dd>${esc(r.fuente.ref)}</dd>
       <dt>Frecuencia</dt><dd>${esc(r.frecuencia)}</dd>
       <dt>Vencimiento</dt><dd>${r.venc?`${fmtDate(r.venc)} ${dueTag(r.venc)}`:'—'}</dd>
-      <dt>Validado por</dt><dd>${esc(S.audit.validador||'—')}</dd>
+      <dt>Validado por</dt><dd>${esc(A.validador||'—')}</dd>
     </dl></div>
     <div class="sec-title">Trazabilidad</div>
     <div class="hist">${r.hist.slice().reverse().map(h=>`<div><b>${esc(h.a)}</b><br><span class="muted xs">${new Date(h.f).toLocaleString('es-CL')} · ${esc(h.q)}</span></div>`).join('')}</div>
@@ -593,33 +689,37 @@ function ring(pct, color){
 }
 const pctColor = p => p==null?'var(--na)':p>=85?'var(--ok)':p>=65?'var(--warn)':'var(--bad)';
 function viewPanel(){
-  const list = activeReqs(), st = stats(list);
-  const insts = INSTALACIONES.map(i=> i.id==='aucha' ? {...i, pct:st.pct, avance:st.avance, nc:st.no_cumple, total:st.total} : {...i, ...i.demo});
+  if(!A) return noAuditHTML();
+  const list = activeReqs(), st = stats(list), inst = instById(A.inst);
   const temas = [...new Set(list.map(r=>r.tema))].map(t=>({t, s:stats(list.filter(r=>r.tema===t))}));
   const venc = list.filter(r=>r.venc && r.estado!=='cumple').sort((a,b)=>a.venc.localeCompare(b.venc)).slice(0,6);
   const hall = list.filter(r=>r.estado==='no_cumple'||r.estado==='parcial');
+  const historial = auditsOf(A.inst);
   return `<div class="stack">
-    <div><h2>Panel de cumplimiento</h2><div class="small muted">Visibilidad por instalación para gerencias</div></div>
+    ${crumbHTML()}
+    <div class="row" style="align-items:flex-start"><div class="grow"><h2>Panel de cumplimiento</h2><div class="small muted">${esc(inst.nombre)} · ${esc(A.nombre)}</div></div>
+      <span class="tag ${STATUS[A.status].cls}">${STATUS[A.status].label}</span></div>
     <div class="kpis">
-      <div class="kpi"><div class="v" style="color:${pctColor(st.pct)}">${st.pct==null?'—':st.pct+'%'}</div><div class="l">Cumplimiento Aucha</div></div>
+      <div class="kpi"><div class="v" style="color:${pctColor(st.pct)}">${st.pct==null?'—':st.pct+'%'}</div><div class="l">Cumplimiento</div></div>
       <div class="kpi"><div class="v">${st.avance}%</div><div class="l">Avance de auditoría</div></div>
       <div class="kpi"><div class="v" style="color:var(--bad)">${st.no_cumple}</div><div class="l">No cumple</div></div>
       <div class="kpi"><div class="v">${list.reduce((n,r)=>n+r.evidencias.length,0)}</div><div class="l">Evidencias cargadas</div></div>
     </div>
-    <div class="sec-title">Instalaciones</div>
-    <div class="inst">${insts.map(i=>`<div class="card row">${ring(i.pct, pctColor(i.pct))}<div class="grow"><b>${esc(i.nombre)}</b><div class="xs muted">${esc(i.tipo)}${i.real?'':' · ficticio'}</div>
-      <div class="xs" style="margin-top:4px">Avance ${i.avance}% · ${i.nc} no cumple · ${i.total} req.</div></div></div>`).join('')}</div>
+    ${A.status==='publicada'?`<div class="card row wrap"><div class="grow small"><b>¿Terminó el trabajo en terreno?</b><br><span class="muted">Al cerrar, la auditoría queda en solo lectura dentro del historial del centro.${st.pendiente?` Quedan ${st.pendiente} pendientes.`:''}</span></div><button class="btn sm" data-action="close-audit">Cerrar auditoría</button></div>`:''}
+    <div class="sec-title">Historial de auditorías · ${esc(inst.nombre)}</div>
+    <div class="card">${historial.map(a=>{ const s=stats(activeReqs(a)); return `<a class="row" href="#/a/${a.id}/panel" style="text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--border)">
+      <span class="grow small"><b>${esc(a.nombre)}</b>${a.id===A.id?' <span class="tag info">abierta</span>':''}<br><span class="muted">${fmtDate(a.fecha)} · ${STATUS[a.status].label}</span></span>
+      <span class="small" style="font-weight:700;color:${pctColor(s.pct)}">${s.pct==null?'—':s.pct+'%'}</span></a>`; }).join('')}</div>
     ${list.length?`
-    <div class="sec-title">Cumplimiento por temática · Aucha</div>
+    <div class="sec-title">Cumplimiento por temática</div>
     <div class="card">${temas.map(({t,s})=>`<div class="bar-row"><span>${esc(t)}</span>${progressBar(s)}<span class="small" style="text-align:right">${s.pct==null?'—':s.pct+'%'}</span></div>`).join('')}
       <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple</span><span><i style="background:var(--warn)"></i>Parcial</span><span><i style="background:var(--bad)"></i>No cumple</span><span><i style="background:var(--na)"></i>N/A</span><span><i style="background:var(--surface-2)"></i>Pendiente</span></div></div>
     <div class="sec-title">Próximos vencimientos</div>
     <div class="card">${venc.length?venc.map(r=>`<a class="row" href="#/req/${r.id}" style="text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--border)"><span class="dot ${r.estado}"></span><span class="grow small"><b>${esc(r.titulo)}</b><br><span class="muted">${fmtDate(r.venc)} · ${esc(r.tema)}</span></span>${dueTag(r.venc)}</a>`).join(''):'<div class="small muted">Sin vencimientos próximos.</div>'}</div>
     <div class="sec-title">Hallazgos (no cumple o parcial)</div>
     <div class="card">${hall.length?hall.map(r=>`<a class="row" href="#/req/${r.id}" style="text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--border)"><span class="dot ${r.estado}"></span><span class="grow small"><b>${esc(r.titulo)}</b><br><span class="muted">${esc(r.obs||'Sin observación')}</span></span></a>`).join(''):'<div class="small muted">Sin hallazgos registrados.</div>'}</div>
-    `:`<div class="empty card">Aún no hay una auditoría publicada para Aucha.</div>`}
-    <div class="sec-title">Alertas de documentos</div>
-    ${ALERTAS.map(alertHTML).join('')}
+    `:`<div class="empty card">Esta auditoría todavía no tiene requisitos validados.</div>`}
+    ${A.inst==='aucha'?`<div class="sec-title">Alertas de documentos</div>${ALERTAS.map(alertHTML).join('')}`:''}
   </div>`;
 }
 
@@ -627,7 +727,7 @@ function viewPanel(){
 const STOP = new Set('el la los las de del y o a en que por para con un una se es al lo como cual cuando cuál cuándo qué que hay debo tengo sobre su sus me mi más'.split(' '));
 function botAnswer(q){
   const tokens = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/[^a-z0-9ñ]+/).filter(t=>t.length>2 && !STOP.has(t));
-  const pool = S.reqs.length ? S.reqs : REQ_TEMPLATES.map(t=>({...t}));
+  const pool = A && A.reqs.length ? A.reqs : REQ_TEMPLATES.map(t=>({...t}));
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   const scored = pool.map(r=>{ const hay = norm(r.titulo+' '+r.tema+' '+r.detalle+' '+r.frecuencia); return {r, s:tokens.reduce((n,t)=>n+(hay.includes(t)?(norm(r.titulo).includes(t)?2:1):0),0)}; }).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,2);
   if(!scored.length) return {text:'No encontré un requisito relacionado en los documentos cargados. Prueba con palabras como “ruido”, “lodos”, “RESPEL”, “playa” o “declaración”.'};
@@ -647,6 +747,16 @@ function chatHTML(){
     <form class="chat-in" id="chat-form"><input type="text" id="chat-q" placeholder="Escribe tu pregunta…" autocomplete="off"><button class="btn primary" aria-label="Enviar">${icon('send',18)}</button></form>
   </div></div>`;
 }
+/* ---------- Diálogo de confirmación propio (window.confirm puede estar bloqueado) ---------- */
+let confirmFn = null;
+function askConfirm({titulo, texto, ok, peligro}, fn){
+  confirmFn = fn;
+  $('#overlay').innerHTML = `<div class="sheet-bg" data-action="confirm-no-bg"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t">
+    <h3 id="dlg-t">${esc(titulo)}</h3><p class="small muted" style="margin:8px 0 16px">${esc(texto)}</p>
+    <div class="row"><button class="btn grow" data-action="confirm-no">Cancelar</button><button class="btn primary grow ${peligro?'danger':''}" data-action="confirm-yes">${esc(ok)}</button></div>
+  </div></div>`;
+  setTimeout(()=>$('[data-action=confirm-no]')?.focus(), 30);
+}
 function openChat(){ $('#overlay').innerHTML = chatHTML(); const m=$('#msgs'); m.scrollTop=m.scrollHeight; setTimeout(()=>$('#chat-q')?.focus(),50); }
 function ask(q){ if(!q.trim()) return; S.chat.push({me:true,text:q}); S.chat.push({me:false,...botAnswer(q)}); save(); openChat(); }
 
@@ -654,13 +764,20 @@ function ask(q){ if(!q.trim()) return; S.chat.push({me:true,text:q}); S.chat.pus
    RENDER
    ========================================================================= */
 function render(){
-  const [r, id] = route();
+  const [r, id, sub] = route();
+  // #/a/ID[/vista] abre una auditoría y lleva a la pantalla que corresponde a su estado
+  if(r==='a'){
+    const a = S.audits.find(x=>x.id===id);
+    if(!a){ location.replace('#/inicio'); return; }
+    S.cur = a.id; S.centro = a.inst; S.adding = false; S.editing = null; S.q = ''; syncA(); save();
+    location.replace('#/' + (sub || STATUS[a.status].ruta)); return;
+  }
+  if(r==='centro' && id) { S.centro = id; save(); }
   renderNav();
-  const inst = INSTALACIONES.find(i=>i.id===S.inst);
-  $('#hdr-sub').textContent = inst ? inst.nombre : '';
-  const views = { inicio:viewInicio, preparar:viewPreparar, terreno:viewTerreno, panel:viewPanel, req:()=>viewReq(id) };
+  $('#hdr-sub').textContent = A && !['inicio','centro','nueva'].includes(r) ? `${instById(A.inst).nombre} · ${A.nombre}` : (r==='centro' && instById(id) ? instById(id).nombre : r==='nueva' && instById(S.centro) ? instById(S.centro).nombre : 'Selecciona un centro');
+  const views = { inicio:viewInicio, centro:()=>viewCentro(id), nueva:viewNueva, preparar:viewPreparar, terreno:viewTerreno, panel:viewPanel, req:()=>viewReq(id) };
   $('#view').innerHTML = (views[r]||viewInicio)();
-  $('#fab').classList.toggle('hide', !(r==='terreno'||r==='req'||r==='preparar') || (r==='preparar' && S.adding));
+  $('#fab').classList.toggle('hide', !A || !(r==='terreno'||r==='req'||r==='preparar') || (r==='preparar' && S.adding));
   updateNet();
 }
 function rerenderList(){ const l=$('#list'); if(l) l.innerHTML = listHTML(); }
@@ -668,10 +785,18 @@ function rerenderList(){ const l=$('#list'); if(l) l.innerHTML = listHTML(); }
 /* =========================================================================
    ACCIONES
    ========================================================================= */
-function addHist(r, a){ r.hist.push({f:nowISO(), a, q: S.audit.validador || 'Usuario de terreno'}); }
+function addHist(r, a){ r.hist.push({f:nowISO(), a, q: A.validador || 'Usuario de terreno'}); }
 
 function generate(){
   const btn = $('#gen-btn'); if(btn) btn.disabled = true;
+  const a = A;
+  if(a.inst!=='aucha'){
+    const log = $('#log'); log.innerHTML='';
+    const n = a.docs.length + a.extras.length;
+    [ n ? `Leyendo ${n} documento${n>1?'s':''}…` : 'No hay documentos cargados.', 'En el prototipo solo se procesan los documentos reales de Piscicultura Aucha.', '0 requisitos detectados: agrégalos manualmente.' ]
+      .forEach((l,i)=>setTimeout(()=>{ log.insertAdjacentHTML('beforeend', `<div>› ${esc(l)}</div>`); if(i===2) setTimeout(()=>{ a.generado=true; a.status='en_validacion'; save(); render(); }, 700); }, 450*(i+1)));
+    return;
+  }
   const lines = [
     `Leyendo ${docById('D1').numero} (141 páginas)…`,
     'Aplicando rectificación del 19-12-2024 (33 considerandos)…',
@@ -684,38 +809,48 @@ function generate(){
   lines.forEach((l,i)=>setTimeout(()=>{
     log.insertAdjacentHTML('beforeend', `<div>› ${esc(l)}</div>`);
     if(i===lines.length-1) setTimeout(()=>{
-      S.reqs = REQ_TEMPLATES.map(t=>({...t, val:'propuesto', estado:'pendiente', obs:'', evidencias:[], hist:[{f:nowISO(), a:'Requisito generado desde '+docById(t.fuente.doc).numero, q:'Sistema'}]}));
-      S.audit.status='en_validacion'; save(); render();
+      a.reqs = [...a.reqs.filter(r=>r.manual), ...REQ_TEMPLATES.map(t=>({...t, val:'propuesto', estado:'pendiente', obs:'', evidencias:[], hist:[{f:nowISO(), a:'Requisito generado desde '+docById(t.fuente.doc, a).numero, q:'Sistema'}]}))];
+      a.generado=true; a.status='en_validacion'; save(); render();
     }, 600);
   }, 450*(i+1)));
 }
 
 function publish(){
-  if(S.audit.status==='publicada'){ location.hash='#/terreno'; return; }
+  if(A.status==='publicada' || A.status==='cerrada'){ location.hash='#/terreno'; return; }
   const name = $('#validador').value.trim(); if(!name) return;
-  S.audit.validador = name;
-  S.reqs.forEach(r=>{
+  A.validador = name;
+  A.reqs.forEach(r=>{
     if(r.val==='descartado') return;
-    if(S.temasOff.includes(r.tema)){ r.val='fuera'; return; }
+    if(A.temasOff.includes(r.tema)){ r.val='fuera'; return; }
     r.val='validado'; r.hist.push({f:nowISO(), a:'Validado para la auditoría', q:name});
   });
-  S.audit.status='publicada'; S.audit.publicada=nowISO(); save(true);
+  A.status='publicada'; A.publicada=nowISO(); save(true);
   toast('Auditoría publicada. Ya está disponible en terreno.');
   location.hash='#/terreno';
 }
 
+// Ejemplo para presentar: Aucha con una auditoría cerrada (Q3) y otra en terreno (Q4)
+function demoAudit({nombre, fecha, publicada, cerrada, set, obs, quien}){
+  const a = newAudit({inst:'aucha', nombre, tipo:'Interna', fecha});
+  a.perts.forEach(p=>p.cargada=true);
+  a.validador='Encargada de Cumplimiento Normativo'; a.generado=true; a.step=4;
+  a.reqs = REQ_TEMPLATES.map(t=>({...t, val:'validado', estado:'pendiente', obs:'', evidencias:[], hist:[
+    {f:fecha+'T10:00:00Z', a:'Requisito generado desde '+DOCS_AUCHA.find(d=>d.id===t.fuente.doc).numero, q:'Sistema'},
+    {f:publicada+'T15:30:00Z', a:'Validado para la auditoría', q:a.validador}]}));
+  a.reqs.forEach(r=>{ if(set[r.id]){ r.estado=set[r.id]; r.obs=obs[r.id]||''; r.evidencias=[{nombre:`evidencia_${r.id.toLowerCase()}.jpg`, fecha:publicada, sync:true}]; r.hist.push({f:publicada+'T18:00:00Z', a:`Marcado como “${ESTADOS[r.estado]}” con 1 evidencia`, q:quien}); }});
+  a.status = cerrada ? 'cerrada' : 'publicada'; a.publicada = publicada; a.cerrada = cerrada || null;
+  return a;
+}
 function demo(){
   S = freshState();
-  S.perts.forEach(p=>p.cargada=true);
-  S.audit.validador='Encargada de Cumplimiento Normativo';
-  S.reqs = REQ_TEMPLATES.map(t=>({...t, val:'validado', estado:'pendiente', obs:'', evidencias:[], hist:[
-    {f:'2026-10-14T10:00:00Z', a:'Requisito generado desde '+DOCS_AUCHA.find(d=>d.id===t.fuente.doc).numero, q:'Sistema'},
-    {f:'2026-10-15T15:30:00Z', a:'Validado para la auditoría', q:'Encargada de Cumplimiento Normativo'}]}));
-  const set = {R01:'cumple',R02:'parcial',R03:'cumple',R05:'cumple',R06:'cumple',R09:'cumple',R10:'cumple',R11:'cumple',R12:'no_cumple',R13:'cumple',R16:'cumple',R20:'parcial',R21:'cumple',R27:'cumple',R28:'no_cumple',R30:'cumple',R35:'na'};
-  const obs = {R02:'Grupos de 635 y 750 kVA con silenciador nuevo; falta el de 50 kVA en L2.', R12:'Faltan registros de pH de 3 días de la semana pasada.', R20:'Limpieza realizada, pero falta la guía de despacho de septiembre.', R28:'Envases de aerosol con fecha de ingreso de marzo 2026 (más de 6 meses).'};
-  S.reqs.forEach(r=>{ if(set[r.id]){ r.estado=set[r.id]; r.obs=obs[r.id]||''; r.evidencias=[{nombre:`evidencia_${r.id.toLowerCase()}.jpg`, fecha:'2026-10-19', sync:true}]; r.hist.push({f:'2026-10-19T12:00:00Z', a:`Marcado como “${ESTADOS[r.estado]}” con 1 evidencia`, q:'Jefe de piscicultura'}); }});
-  S.audit.status='publicada'; S.audit.publicada='2026-10-15'; S.step=4;
-  save(); toast('Auditoría de ejemplo cargada'); location.hash='#/terreno'; render();
+  const q3set = {}; REQ_TEMPLATES.forEach((t,i)=>{ q3set[t.id] = i%9===4 ? 'no_cumple' : i%7===3 ? 'parcial' : i%11===10 ? 'na' : 'cumple'; });
+  const q3 = demoAudit({ nombre:'Auditoría interna Q3 2026', fecha:'2026-07-08', publicada:'2026-07-10', cerrada:'2026-07-24', set:q3set,
+    obs:{R06:'Bitácora diaria incompleta en junio.', R13:'Ducha lavaojos sin señalética.', R22:'Capacitación agendada para agosto.'}, quien:'Jefe de piscicultura' });
+  const q4 = demoAudit({ nombre:'Auditoría interna Q4 2026', fecha:'2026-10-14', publicada:'2026-10-15', quien:'Jefe de piscicultura',
+    set:{R01:'cumple',R02:'parcial',R03:'cumple',R05:'cumple',R06:'cumple',R09:'cumple',R10:'cumple',R11:'cumple',R12:'no_cumple',R13:'cumple',R16:'cumple',R20:'parcial',R21:'cumple',R27:'cumple',R28:'no_cumple',R30:'cumple',R35:'na'},
+    obs:{R02:'Grupos de 635 y 750 kVA con silenciador nuevo; falta el de 50 kVA en L2.', R12:'Faltan registros de pH de 3 días de la semana pasada.', R20:'Limpieza realizada, pero falta la guía de despacho de septiembre.', R28:'Envases de aerosol con fecha de ingreso de marzo 2026 (más de 6 meses).'} });
+  S.audits = [q3, q4]; S.centro='aucha'; S.cur=q4.id; syncA();
+  save(); toast('Ejemplo cargado: 2 auditorías en Piscicultura Aucha'); location.hash='#/centro/aucha'; render();
 }
 
 function resizeImage(file){
@@ -727,7 +862,7 @@ function resizeImage(file){
 }
 let evTarget = null;
 async function onEvidence(file){
-  const r = S.reqs.find(x=>x.id===evTarget); if(!r||!file) return;
+  const r = A.reqs.find(x=>x.id===evTarget); if(!r||!file) return;
   const thumb = file.type.startsWith('image/') ? await resizeImage(file) : null;
   r.evidencias.push({nombre:file.name||'foto.jpg', fecha:new Date().toISOString().slice(0,10), thumb, sync:false});
   addHist(r, `Evidencia agregada: ${file.name||'foto'}`);
@@ -737,26 +872,35 @@ async function onEvidence(file){
 document.addEventListener('click', e=>{
   const el = e.target.closest('[data-action]'); if(!el) return;
   const a = el.dataset.action, id = el.dataset.id;
-  const req = id && S.reqs.find(r=>r.id===id);
+  const req = id && A && A.reqs.find(r=>r.id===id);
   switch(a){
-    case 'pick-inst': S.inst=id; save(); render(); break;
-    case 'step': S.step=+el.dataset.n; save(); render(); window.scrollTo(0,0); break;
-    case 'pert-load': { const p=S.perts.find(x=>x.id===id); p.cargada=true; save(); render(); toast('Pertinencia cargada'); break; }
+    case 'create-audit': {
+      const nombre = $('#nv-nombre').value.trim(); if(!nombre){ toast('Ponle un nombre a la auditoría'); break; }
+      const au = newAudit({inst:$('#nv-inst').value, nombre, tipo:$('#nv-tipo').value, fecha:$('#nv-fecha').value || new Date().toISOString().slice(0,10)});
+      S.audits.push(au); save(); toast('Auditoría creada'); location.hash = '#/a/'+au.id+'/preparar'; break;
+    }
+    case 'close-audit': askConfirm({titulo:'¿Cerrar la auditoría?', texto:'Quedará en solo lectura dentro del historial del centro. Podrás revisar sus resultados y evidencias, pero no modificarlos.', ok:'Cerrar auditoría'},
+      ()=>{ A.status='cerrada'; A.cerrada=new Date().toISOString().slice(0,10); save(true); toast('Auditoría cerrada'); render(); }); break;
+    case 'confirm-yes': { const fn=confirmFn; confirmFn=null; $('#overlay').innerHTML=''; fn && fn(); break; }
+    case 'confirm-no': confirmFn=null; $('#overlay').innerHTML=''; break;
+    case 'confirm-no-bg': if(e.target===el){ confirmFn=null; $('#overlay').innerHTML=''; } break;
+    case 'step': A.step=+el.dataset.n; save(); render(); window.scrollTo(0,0); break;
+    case 'pert-load': { const p=A.perts.find(x=>x.id===id); p.cargada=true; save(); render(); toast('Pertinencia cargada'); break; }
     case 'generate': generate(); break;
-    case 'toggle-tema': { const t=el.dataset.t; S.temasOff = S.temasOff.includes(t) ? S.temasOff.filter(x=>x!==t) : [...S.temasOff, t]; save(); render(); break; }
+    case 'toggle-tema': { const t=el.dataset.t; A.temasOff = A.temasOff.includes(t) ? A.temasOff.filter(x=>x!==t) : [...A.temasOff, t]; save(); render(); break; }
     case 'edit': S.editing=id; render(); break;
     case 'edit-cancel': S.editing=null; render(); break;
-    case 'edit-save': req.titulo=$('#ed-t').value.trim()||req.titulo; req.detalle=$('#ed-d').value.trim()||req.detalle; req.editado=true; req.hist.push({f:nowISO(),a:'Editado por el responsable',q:S.audit.validador||'Responsable'}); S.editing=null; save(); render(); break;
-    case 'discard': req.val='descartado'; req.hist.push({f:nowISO(),a:'Descartado por el responsable',q:S.audit.validador||'Responsable'}); save(); render(); break;
-    case 'restore': req.val= S.audit.status==='publicada'?'validado':'propuesto'; save(); render(); break;
+    case 'edit-save': req.titulo=$('#ed-t').value.trim()||req.titulo; req.detalle=$('#ed-d').value.trim()||req.detalle; req.editado=true; req.hist.push({f:nowISO(),a:'Editado por el responsable',q:A.validador||'Responsable'}); S.editing=null; save(); render(); break;
+    case 'discard': req.val='descartado'; req.hist.push({f:nowISO(),a:'Descartado por el responsable',q:A.validador||'Responsable'}); save(); render(); break;
+    case 'restore': req.val= A.status==='publicada'?'validado':'propuesto'; save(); render(); break;
     case 'add-open': S.adding=true; render(); setTimeout(()=>{ $('#add-form')?.scrollIntoView({behavior:'smooth',block:'start'}); $('#add-tema')?.focus(); },50); break;
-    case 'add-from-field': S.step=4; S.adding=true; save(); location.hash='#/preparar'; setTimeout(()=>{ $('#add-form')?.scrollIntoView({block:'start'}); $('#add-tema')?.focus(); },80); break;
+    case 'add-from-field': A.step=4; S.adding=true; save(); location.hash='#/preparar'; setTimeout(()=>{ $('#add-form')?.scrollIntoView({block:'start'}); $('#add-tema')?.focus(); },80); break;
     case 'add-cancel': S.adding=false; render(); break;
     case 'add-save': {
       const tema=$('#add-tema').value.trim(), titulo=$('#add-titulo').value.trim();
       if(!tema||!titulo){ toast('Completa la temática y el requisito'); break; }
-      const venc=$('#add-venc').value.trim(), pub=S.audit.status==='publicada', quien=S.audit.validador||'Responsable';
-      const n = S.reqs.filter(r=>r.manual).length+1;
+      const venc=$('#add-venc').value.trim(), pub=A.status==='publicada', quien=A.validador||'Responsable';
+      const n = A.reqs.filter(r=>r.manual).length+1;
       const r = { id:'M'+String(n).padStart(2,'0')+'-'+Date.now().toString(36).slice(-3), manual:true, tema, titulo,
         detalle:$('#add-detalle').value.trim()||'Requisito agregado por el responsable.',
         fuente:{doc:$('#add-doc').value, ref:$('#add-ref').value.trim()||'—'}, frecuencia:$('#add-frec').value,
@@ -764,8 +908,8 @@ document.addEventListener('click', e=>{
         val:pub?'validado':'propuesto', estado:'pendiente', obs:'', evidencias:[],
         hist:[{f:nowISO(), a:'Agregado manualmente (no detectado por el análisis)', q:quien}] };
       if(pub) r.hist.push({f:nowISO(), a:'Validado para la auditoría', q:quien});
-      S.temasOff = S.temasOff.filter(t=>t!==tema);
-      S.reqs.push(r); S.adding=false; save(pub);
+      A.temasOff = A.temasOff.filter(t=>t!==tema);
+      A.reqs.push(r); S.adding=false; save(pub);
       if(pub){ toast('Requisito agregado a la auditoría en terreno'); location.hash='#/req/'+r.id; }
       else { render(); toast('Requisito agregado'); }
       break;
@@ -778,7 +922,8 @@ document.addEventListener('click', e=>{
     case 'ev-del': { req.evidencias.splice(+el.dataset.i,1); addHist(req,'Evidencia eliminada'); save(true); render(); break; }
     case 'theme': toggleTheme(); break;
     case 'demo': demo(); break;
-    case 'reset': if(confirm('¿Borrar los datos del prototipo en este dispositivo?')){ S=freshState(); save(); location.hash='#/inicio'; render(); } break;
+    case 'reset': askConfirm({titulo:'¿Reiniciar el prototipo?', texto:'Se borrarán todas las auditorías, requisitos y evidencias guardados en este dispositivo.', ok:'Borrar todo', peligro:true},
+      ()=>{ S=freshState(); syncA(); save(); toast('Prototipo reiniciado'); if(location.hash==='#/inicio') render(); else location.hash='#/inicio'; window.scrollTo(0,0); }); break;
     case 'chat-open': openChat(); break;
     case 'chat-close': $('#overlay').innerHTML=''; break;
     case 'chat-close-bg': if(e.target===el) $('#overlay').innerHTML=''; break;
@@ -787,13 +932,13 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('input', e=>{
   if(e.target.id==='q'){ S.q=e.target.value; rerenderList(); }
-  if(e.target.id==='validador'){ S.audit.validador=e.target.value; const b=$('#pub-btn'); if(b) b.disabled=!e.target.value.trim(); }
+  if(e.target.id==='validador'){ A.validador=e.target.value; const b=$('#pub-btn'); if(b) b.disabled=!e.target.value.trim() || !A.reqs.some(r=>r.val!=='descartado' && !A.temasOff.includes(r.tema)); }
 });
 document.addEventListener('change', e=>{
-  if(e.target.id==='obs'){ const r=S.reqs.find(x=>x.id===e.target.dataset.id); r.obs=e.target.value; addHist(r,'Observación actualizada'); save(true); }
+  if(e.target.id==='obs'){ const r=A.reqs.find(x=>x.id===e.target.dataset.id); r.obs=e.target.value; addHist(r,'Observación actualizada'); save(true); }
   if(e.target.id==='validador') save();
-  if(e.target.id==='file-doc' && e.target.files[0]){ const f=e.target.files[0]; S.extras.push({id:'X'+Date.now(), tipo:'Documento', numero:f.name, titulo:'Cargado por el usuario · se procesará al generar', vigencia:'Por verificar', estado:'info'}); save(); render(); toast('Documento cargado'); }
-  if(e.target.id==='file-pert' && e.target.files[0]){ const f=e.target.files[0]; S.perts.push({id:'P'+Date.now(), numero:f.name, titulo:'Pertinencia cargada por el usuario', cargada:true}); save(); render(); }
+  if(e.target.id==='file-doc' && e.target.files[0]){ const f=e.target.files[0]; A.extras.push({id:'X'+Date.now(), tipo:'Documento', numero:f.name, titulo:'Cargado por el usuario · se procesará al generar', vigencia:'Por verificar', estado:'info'}); save(); render(); toast('Documento cargado'); }
+  if(e.target.id==='file-pert' && e.target.files[0]){ const f=e.target.files[0]; A.perts.push({id:'P'+Date.now(), numero:f.name, titulo:'Pertinencia cargada por el usuario', cargada:true}); save(); render(); }
   if((e.target.id==='file-photo'||e.target.id==='file-any') && e.target.files[0]) onEvidence(e.target.files[0]);
   e.target.value && e.target.type==='file' && (e.target.value='');
 });
@@ -801,7 +946,7 @@ document.addEventListener('submit', e=>{ if(e.target.id==='chat-form'){ e.preven
 
 /* ---------- Conectividad: guarda local y sincroniza al volver la señal ---------- */
 let syncTimer=null;
-function scheduleSync(){ updateNet(); if(!navigator.onLine) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>{ S.reqs.forEach(r=>r.evidencias.forEach(ev=>ev.sync=true)); S.pending=0; try{localStorage.setItem(KEY, JSON.stringify(S));}catch(e){} updateNet(); }, 1500); }
+function scheduleSync(){ updateNet(); if(!navigator.onLine) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>{ S.audits.forEach(a=>a.reqs.forEach(r=>r.evidencias.forEach(ev=>ev.sync=true))); S.pending=0; try{localStorage.setItem(KEY, JSON.stringify(S));}catch(e){} updateNet(); }, 1500); }
 function updateNet(){
   const n=$('#net'); if(!n) return;
   if(!navigator.onLine){ n.className='net off'; n.textContent = `Sin conexión${S.pending?` · ${S.pending} por sincronizar`:''}`; }

@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router";
+import { api, attempt, type NuevoRequisito, run } from "../api";
 import { Icon } from "../components/Icon";
 import { Crumb, instById } from "../components/ui";
 import { NORMAS_CITADAS, REQ_TEMPLATES } from "../data/seed";
@@ -14,8 +15,7 @@ import { docById, temasDe } from "../domain/auditoria";
 import { FRECUENCIAS, STATUS } from "../domain/constants";
 import { fmtDate } from "../domain/format";
 import { useAuditCtx } from "../hooks/useAuditCtx";
-import { type NuevoRequisito, useAuditStore } from "../store/useAuditStore";
-import { toast } from "../store/useUiStore";
+import { toast, useUiStore } from "../store/useUiStore";
 
 const PASOS = ["Datos", "Documentos", "Pertinencias", "Requisitos"];
 
@@ -56,9 +56,8 @@ function Nav({
   atras?: number;
   sigue?: number;
 }) {
-  const setStep = useAuditStore((s) => s.setStep);
   const go = (n: number) => {
-    setStep(a.id, n);
+    void run(api.audits.setStep(a.id, n));
     window.scrollTo(0, 0);
   };
   return (
@@ -128,7 +127,6 @@ function FilePick({
 }
 
 function PasoDocs({ a }: { a: Auditoria }) {
-  const addExtraDoc = useAuditStore((s) => s.addExtraDoc);
   const docs = [...a.docs, ...a.extras];
   return (
     <div className="stack">
@@ -167,10 +165,11 @@ function PasoDocs({ a }: { a: Auditoria }) {
       </div>
       <FilePick
         accept="application/pdf,.pdf,.doc,.docx"
-        onFile={(f) => {
-          addExtraDoc(a.id, f.name);
-          toast("Documento cargado");
-        }}
+        onFile={(f) =>
+          void attempt(api.documents.upload(a.id, f)).then(
+            (ok) => ok && toast("Documento cargado"),
+          )
+        }
       >
         <Icon name="clip" />
         <br />
@@ -184,8 +183,6 @@ function PasoDocs({ a }: { a: Auditoria }) {
 }
 
 function PasoPerts({ a }: { a: Auditoria }) {
-  const loadPert = useAuditStore((s) => s.loadPert);
-  const addPert = useAuditStore((s) => s.addPert);
   return (
     <div className="stack">
       <div className="card">
@@ -209,10 +206,11 @@ function PasoPerts({ a }: { a: Auditoria }) {
               ) : (
                 <button
                   className="btn sm"
-                  onClick={() => {
-                    loadPert(a.id, p.id);
-                    toast("Pertinencia cargada");
-                  }}
+                  onClick={() =>
+                    void attempt(
+                      api.documents.loadPertinencia(a.id, p.id),
+                    ).then((ok) => ok && toast("Pertinencia cargada"))
+                  }
                 >
                   Cargar
                 </button>
@@ -225,7 +223,7 @@ function PasoPerts({ a }: { a: Auditoria }) {
       </div>
       <FilePick
         accept="application/pdf,.pdf"
-        onFile={(f) => addPert(a.id, f.name)}
+        onFile={(f) => void run(api.documents.uploadPertinencia(a.id, f))}
       >
         <Icon name="clip" />
         <br />
@@ -250,7 +248,6 @@ function PasoPerts({ a }: { a: Auditoria }) {
 
 /** Generación simulada: muestra el avance y luego carga los requisitos de ejemplo. */
 function Generar({ a }: { a: Auditoria }) {
-  const finish = useAuditStore((s) => s.finishGenerate);
   const [lines, setLines] = useState<string[] | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -279,7 +276,10 @@ function Generar({ a }: { a: Auditoria }) {
       setTimeout(() => setLines((prev) => [...(prev ?? []), l]), 450 * (i + 1)),
     );
     timers.current.push(
-      setTimeout(() => finish(a.id), 450 * plan.length + 650),
+      setTimeout(
+        () => void run(api.obligations.generate(a.id)),
+        450 * plan.length + 650,
+      ),
     );
   };
 
@@ -303,7 +303,7 @@ function Generar({ a }: { a: Auditoria }) {
       <div className="sticky-foot row">
         <button
           className="btn"
-          onClick={() => useAuditStore.getState().setStep(a.id, 3)}
+          onClick={() => void run(api.audits.setStep(a.id, 3))}
         >
           Atrás
         </button>
@@ -321,7 +321,10 @@ function Generar({ a }: { a: Auditoria }) {
 
 function PasoReqs({ a }: { a: Auditoria }) {
   const navigate = useNavigate();
-  const s = useAuditStore();
+  const adding = useUiStore((s) => s.adding);
+  const setAdding = useUiStore((s) => s.setAdding);
+  // El responsable se envía al publicar (PublicarAuditoria en la API).
+  const [validador, setValidador] = useState(a.validador);
   if (!a.generado) return <Generar a={a} />;
 
   const temas = temasDe(a.reqs);
@@ -330,9 +333,9 @@ function PasoReqs({ a }: { a: Auditoria }) {
   );
   const published = a.status === "publicada" || a.status === "cerrada";
 
-  const publicar = () => {
+  const publicar = async () => {
     if (!published) {
-      s.publish(a.id);
+      if (!(await attempt(api.audits.publish(a.id, validador.trim())))) return;
       toast("Auditoría publicada. Ya está disponible en terreno.");
     }
     void navigate("../terreno");
@@ -366,7 +369,7 @@ function PasoReqs({ a }: { a: Auditoria }) {
             <button
               key={t}
               className={`chip ${a.temasOff.includes(t) ? "" : "on"}`}
-              onClick={() => s.toggleTema(a.id, t)}
+              onClick={() => void run(api.audits.toggleCategory(a.id, t))}
             >
               {t} ·{" "}
               {
@@ -377,10 +380,10 @@ function PasoReqs({ a }: { a: Auditoria }) {
           ))}
         </div>
       </div>
-      {s.adding ? (
+      {adding ? (
         <AddReqForm a={a} temas={temas} />
       ) : (
-        <button className="btn block" onClick={() => s.setAdding(true)}>
+        <button className="btn block" onClick={() => setAdding(true)}>
           + Agregar requisito que no detectó el análisis
         </button>
       )}
@@ -396,7 +399,7 @@ function PasoReqs({ a }: { a: Auditoria }) {
               ))}
           </div>
         ))}
-      {!s.adding && (
+      {!adding && (
         <div className="card sticky-foot stack">
           {published ? (
             <div className="small">
@@ -412,15 +415,15 @@ function PasoReqs({ a }: { a: Auditoria }) {
                 type="text"
                 id="validador"
                 placeholder="Nombre y cargo"
-                value={a.validador}
-                onChange={(e) => s.setValidador(a.id, e.target.value)}
+                value={validador}
+                onChange={(e) => setValidador(e.target.value)}
               />
             </>
           )}
           <button
             className="btn primary block"
-            disabled={!published && !(a.validador.trim() && sel.length)}
-            onClick={publicar}
+            disabled={!published && !(validador.trim() && sel.length)}
+            onClick={() => void publicar()}
           >
             {published
               ? "Ir a terreno"
@@ -433,7 +436,6 @@ function PasoReqs({ a }: { a: Auditoria }) {
 }
 
 function ReqValidacion({ a, r }: { a: Auditoria; r: Requisito }) {
-  const s = useAuditStore();
   const [editing, setEditing] = useState(false);
   const [titulo, setTitulo] = useState(r.titulo);
   const [detalle, setDetalle] = useState(r.detalle);
@@ -458,7 +460,7 @@ function ReqValidacion({ a, r }: { a: Auditoria; r: Requisito }) {
           <button
             className="btn sm primary"
             onClick={() => {
-              s.editReq(a.id, r.id, titulo, detalle);
+              void run(api.obligations.edit(a.id, r.id, titulo, detalle));
               setEditing(false);
             }}
           >
@@ -495,7 +497,10 @@ function ReqValidacion({ a, r }: { a: Auditoria; r: Requisito }) {
       )}
       <div className="row" style={{ marginTop: 8, gap: 6 }}>
         {r.val === "descartado" ? (
-          <button className="btn sm" onClick={() => s.restoreReq(a.id, r.id)}>
+          <button
+            className="btn sm"
+            onClick={() => void run(api.obligations.restore(a.id, r.id))}
+          >
             Restaurar
           </button>
         ) : (
@@ -510,7 +515,10 @@ function ReqValidacion({ a, r }: { a: Auditoria; r: Requisito }) {
             >
               Editar
             </button>
-            <button className="btn sm" onClick={() => s.discardReq(a.id, r.id)}>
+            <button
+              className="btn sm"
+              onClick={() => void run(api.obligations.discard(a.id, r.id))}
+            >
               Descartar
             </button>
           </>
@@ -533,8 +541,7 @@ const VACIO: NuevoRequisito = {
 
 function AddReqForm({ a, temas }: { a: Auditoria; temas: string[] }) {
   const navigate = useNavigate();
-  const addReq = useAuditStore((s) => s.addReq);
-  const setAdding = useAuditStore((s) => s.setAdding);
+  const setAdding = useUiStore((s) => s.setAdding);
   const fuentes = [...a.docs, ...a.extras, ...a.perts.filter((p) => p.cargada)];
   const [f, setF] = useState<NuevoRequisito>({
     ...VACIO,
@@ -556,20 +563,24 @@ function AddReqForm({ a, temas }: { a: Auditoria; temas: string[] }) {
     temaRef.current?.focus();
   }, []);
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!f.tema.trim() || !f.titulo.trim()) {
       toast("Completa la temática y el requisito");
       return;
     }
     const pub = a.status === "publicada";
-    const id = addReq(a.id, {
-      ...f,
-      tema: f.tema.trim(),
-      titulo: f.titulo.trim(),
-      detalle: f.detalle.trim(),
-      ref: f.ref.trim(),
-      evidencia: f.evidencia.trim(),
-    });
+    const id = await run(
+      api.obligations.create(a.id, {
+        ...f,
+        tema: f.tema.trim(),
+        titulo: f.titulo.trim(),
+        detalle: f.detalle.trim(),
+        ref: f.ref.trim(),
+        evidencia: f.evidencia.trim(),
+      }),
+    );
+    if (!id) return;
+    setAdding(false);
     if (pub) {
       toast("Requisito agregado a la auditoría en terreno");
       void navigate(`../terreno/${id}`);
@@ -668,7 +679,7 @@ function AddReqForm({ a, temas }: { a: Auditoria; temas: string[] }) {
         <button className="btn" onClick={() => setAdding(false)}>
           Cancelar
         </button>
-        <button className="btn primary grow" onClick={guardar}>
+        <button className="btn primary grow" onClick={() => void guardar()}>
           Agregar requisito
         </button>
       </div>

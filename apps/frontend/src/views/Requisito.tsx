@@ -7,7 +7,7 @@ import { docById, numeracion } from "../domain/auditoria";
 import { ESTADOS, MARCABLES, NA_MOTIVOS, NA_OTRO } from "../domain/constants";
 import { fmtDate } from "../domain/format";
 import { useAuditCtx } from "../hooks/useAuditCtx";
-import { useAuditStore } from "../store/useAuditStore";
+import { api, attempt, run } from "../api";
 import { toast } from "../store/useUiStore";
 
 export function RequisitoView() {
@@ -19,7 +19,6 @@ export function RequisitoView() {
 function Detalle({ reqId }: { reqId?: string }) {
   const a = useAuditCtx();
   const { state } = useLocation() as { state: { focoObs?: boolean } | null };
-  const { marcar, setObs, setNaMotivo, delEvidence } = useAuditStore();
   const r = a.reqs.find((x) => x.id === reqId);
   const [obs, setObsLocal] = useState(r?.obs ?? "");
   // Viene de elegir "Otro motivo" en la lista: hay que escribir el motivo.
@@ -36,8 +35,9 @@ function Detalle({ reqId }: { reqId?: string }) {
 
   const elegir = (k: (typeof MARCABLES)[number]) => {
     if (r.estado === k) {
-      marcar(a.id, r.id, "pendiente");
-      toast("Estado borrado");
+      void attempt(api.items.assess(a.id, r.id, { estado: "pendiente" })).then(
+        (ok) => ok && toast("Estado borrado"),
+      );
       return;
     }
     if (k === "no_cumple" && !obs.trim()) {
@@ -46,9 +46,14 @@ function Detalle({ reqId }: { reqId?: string }) {
       obsRef.current?.focus();
       return;
     }
-    marcar(a.id, r.id, k, { obs });
-    toast(
-      k === "na" ? "Elige el motivo de No aplica" : `Guardado: ${ESTADOS[k]}`,
+    void attempt(api.items.assess(a.id, r.id, { estado: k, obs })).then(
+      (ok) =>
+        ok &&
+        toast(
+          k === "na"
+            ? "Elige el motivo de No aplica"
+            : `Guardado: ${ESTADOS[k]}`,
+        ),
     );
   };
 
@@ -58,7 +63,7 @@ function Detalle({ reqId }: { reqId?: string }) {
       toast("La observación es obligatoria para No cumple");
       return;
     }
-    setObs(a.id, r.id, obs);
+    void run(api.items.setNotes(a.id, r.id, obs));
   };
 
   return (
@@ -114,10 +119,11 @@ function Detalle({ reqId }: { reqId?: string }) {
                 key={m}
                 className={r.naMotivo === m ? "on" : ""}
                 disabled={ro}
-                onClick={() => {
-                  setNaMotivo(a.id, r.id, m);
-                  toast("Motivo guardado");
-                }}
+                onClick={() =>
+                  void attempt(api.items.setNaReason(a.id, r.id, m)).then(
+                    (ok) => ok && toast("Motivo guardado"),
+                  )
+                }
               >
                 {m}
               </button>
@@ -173,7 +179,7 @@ function Detalle({ reqId }: { reqId?: string }) {
                 <button
                   className="btn ghost sm"
                   aria-label="Quitar"
-                  onClick={() => delEvidence(a.id, r.id, i)}
+                  onClick={() => void run(api.evidence.remove(a.id, r.id, i))}
                 >
                   <Icon name="x" size={16} />
                 </button>

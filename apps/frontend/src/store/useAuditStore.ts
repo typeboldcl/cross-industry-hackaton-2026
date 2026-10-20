@@ -7,43 +7,26 @@ import type {
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
+import type { NuevoRequisito } from "../api/types";
 import { REQ_TEMPLATES } from "../data/seed";
 import { activeReqs } from "../domain/auditoria";
-import { botAnswer, type MensajeChat } from "../domain/chat";
 import { ESTADOS, NA_MOTIVOS } from "../domain/constants";
 import { demoAudits, fromExtraido, newAudit } from "../domain/factories";
 import { nowISO, today } from "../domain/format";
 
-export type Tab = "todos" | "done" | "pend";
-
-/** Lo que se guarda en el teléfono (localStorage) para trabajar sin conexión. */
+/**
+ * Caché local de los datos, guardada en el teléfono (localStorage) para
+ * trabajar sin conexión. Las pantallas no la usan directo: pasan por `src/api`,
+ * que hoy la usa como backend simulado.
+ */
 interface Persisted {
   audits: Auditoria[];
   seq: number;
   /** Cambios guardados localmente que faltan por sincronizar. */
   pending: number;
-  chat: MensajeChat[];
-  tab: Tab;
-}
-
-interface Transient {
-  q: string;
-  /** Formulario "agregar requisito" abierto en Preparar. */
-  adding: boolean;
 }
 
 export type Undo = () => void;
-
-export interface NuevoRequisito {
-  tema: string;
-  titulo: string;
-  detalle: string;
-  doc: string;
-  ref: string;
-  frecuencia: string;
-  venc: string;
-  evidencia: string;
-}
 
 interface Actions {
   createAudit: (
@@ -76,25 +59,17 @@ interface Actions {
   addEvidence: (aid: string, rid: string, ev: Evidencia) => void;
   delEvidence: (aid: string, rid: string, i: number) => void;
   closeAudit: (aid: string) => void;
-  ask: (q: string, aid?: string) => void;
-  setTab: (tab: Tab) => void;
-  setQ: (q: string) => void;
-  setAdding: (adding: boolean) => void;
   markSynced: () => void;
   loadDemo: () => void;
   reset: () => void;
 }
 
-export type AuditState = Persisted & Transient & Actions;
+export type AuditState = Persisted & Actions;
 
-const initial = (): Persisted & Transient => ({
+const initial = (): Persisted => ({
   audits: [],
   seq: 0,
   pending: 0,
-  chat: [],
-  tab: "todos",
-  q: "",
-  adding: false,
 });
 
 const quien = (a: Auditoria) => a.validador || "Usuario de terreno";
@@ -277,7 +252,6 @@ export const useAuditStore = create<AuditState>()(
             },
             pub,
           );
-          set((s) => void (s.adding = false));
           return r.id;
         },
         setValidador: (aid, nombre) =>
@@ -405,16 +379,6 @@ export const useAuditStore = create<AuditState>()(
             },
             true,
           ),
-        ask(q, aid) {
-          if (!q.trim()) return;
-          const answer = botAnswer(q, (aid && find(aid)) || null);
-          set((s) => {
-            s.chat.push({ me: true, text: q }, answer);
-          });
-        },
-        setTab: (tab) => set((s) => void (s.tab = tab)),
-        setQ: (q) => set((s) => void (s.q = q)),
-        setAdding: (adding) => set((s) => void (s.adding = adding)),
         markSynced: () =>
           set((s) => {
             s.audits.forEach((a) =>
@@ -435,19 +399,22 @@ export const useAuditStore = create<AuditState>()(
     }),
     {
       name: "auditorias-react-v1",
-      version: 1,
+      // v2: se quitó el chat; los datos guardados antes simplemente lo pierden.
+      version: 2,
+      migrate: (old) => {
+        const {
+          audits = [],
+          seq = 0,
+          pending = 0,
+        } = (old ?? {}) as Partial<Persisted>;
+        return { audits, seq, pending } as AuditState;
+      },
       storage: createJSONStorage(() => localStorage),
       partialize: (s): Persisted => ({
         audits: s.audits,
         seq: s.seq,
         pending: s.pending,
-        chat: s.chat,
-        tab: s.tab,
       }),
     },
   ),
 );
-
-/** Auditoría por id (o null), para usar dentro de componentes. */
-export const useAudit = (aid: string | undefined) =>
-  useAuditStore((s) => s.audits.find((a) => a.id === aid) ?? null);

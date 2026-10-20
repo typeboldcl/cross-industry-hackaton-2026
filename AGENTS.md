@@ -41,8 +41,9 @@ Run that last line before saying a change is done. If Node or pnpm is not availa
 
 - `src/App.tsx`: routes. The open audit lives in the URL (`#/auditorias/:auditId/terreno`), so every screen is linkable.
 - `src/views/`: one file per screen (Inicio = centros, Centro, Nueva, Preparar, Terreno, Requisito, Panel).
-- `src/domain/`: pure logic (stats, sheet numbering, factories, chat, evidence). Keep it free of React so it stays testable; tests live next to it (`*.spec.ts`).
-- `src/store/useAuditStore.ts`: persisted audits (`localStorage` key `auditorias-react-v1`). `useUiStore.ts`: toasts, dialogs, chat.
+- `src/api/`: the only way screens read and change data (`api.*`, `useAudits`, `useAudit`). `localApi` implements it on the local store; an HTTP implementation will replace it. Screens must not import the stores' data actions directly.
+- `src/domain/`: pure logic (stats, sheet numbering, factories, evidence). Keep it free of React so it stays testable; tests live next to it (`*.spec.ts`).
+- `src/store/useAuditStore.ts`: persisted local data (`localStorage` key `auditorias-react-v1`), used only by `src/api/`. `useUiStore.ts`: toasts, dialogs and Terreno filters.
 - `src/data/seed.ts`: example installations, the Piscicultura Aucha documents and `REQ_TEMPLATES`, the 35 requirements extracted by hand.
 - `src/styles.css`: Invermar palette (navy `#03215C`, accent `#00BBFF`, primary `#0072B2`). Light theme by default, dark theme only when the user picks it.
 
@@ -56,7 +57,7 @@ Run that last line before saying a change is done. If Node or pnpm is not availa
 - Requirements are numbered like the paper sheet (1-a, 1-b…) from their original order, so codes never change when filtering.
 - Every change appends to the requirement's history (`hist`: date, action, who). Traceability is a core selling point.
 - Manually added requirements are flagged `manual: true`, and their source can be `"MANUAL"` (criterio del responsable).
-- The chat must **always cite the source document and reference** in its answers.
+- There is no chat: the team decided not to include the regulations chatbot. The HTML prototype still has it only as a historical reference.
 
 ## The extraction contract
 
@@ -70,12 +71,12 @@ Beyond the list, extraction should also:
 
 ## What is mocked today
 
-- "Generar requisitos" loads `REQ_TEMPLATES` instead of calling an LLM. The chat matches keywords over the audit's requirements.
+- "Generar requisitos" loads `REQ_TEMPLATES` instead of calling an LLM.
 - Uploading a document only records its file name.
 - Persistence is browser `localStorage`. Sync is simulated (evidence is marked synced 1.5 s after the last change while online).
 - Only Piscicultura Aucha has real documents. The other two installations use made-up numbers. Most due dates are examples, except the SUSPEL declaration (20 December), which comes from the resolution.
 
-Likely next steps: backend endpoints for audits and extraction (typed in `contracts`), replace `REQ_TEMPLATES` with the real extraction, chat with retrieval over the centro's documents, real offline sync (Service Worker + IndexedDB + queue), roles (cumplimiento, centro, gerencia).
+Likely next steps: backend endpoints for audits and extraction (typed in `contracts`), replace `REQ_TEMPLATES` with the real extraction, real offline sync (Service Worker + IndexedDB + queue), roles (cumplimiento, centro, gerencia).
 
 ## Data and privacy
 

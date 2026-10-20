@@ -6,7 +6,7 @@ import { ALERTAS, DOCS_AUCHA } from "../data/seed";
 import { activeReqs, auditsOf, stats } from "../domain/auditoria";
 import { INST_ICON, STATUS } from "../domain/constants";
 import { fmtDate } from "../domain/format";
-import { useAuditStore } from "../store/useAuditStore";
+import { useAudits } from "../api";
 
 function AuditCard({ a }: { a: Auditoria }) {
   const st = stats(activeReqs(a));
@@ -58,7 +58,7 @@ function AuditCard({ a }: { a: Auditoria }) {
 
 export function Centro() {
   const { centroId } = useParams();
-  const audits = useAuditStore((s) => s.audits);
+  const audits = useAudits();
   const i = instById(centroId);
   if (!i) return <Navigate to="/" replace />;
 

@@ -15,29 +15,42 @@ export interface ConfirmReq {
   onOk: () => void;
 }
 
+/** Pestaña de Terreno: todos, llenados o pendientes. */
+export type Tab = "todos" | "done" | "pend";
+
 interface UiState {
   toast: ToastMsg | null;
   confirm: ConfirmReq | null;
-  chatOpen: boolean;
+  tab: Tab;
+  /** Búsqueda en Terreno. */
+  q: string;
+  /** Formulario "agregar requisito" abierto en Preparar. */
+  adding: boolean;
+  setTab: (tab: Tab) => void;
+  setQ: (q: string) => void;
+  setAdding: (adding: boolean) => void;
   showToast: (msg: string, undo?: () => void) => void;
   hideToast: (id: number) => void;
   askConfirm: (req: ConfirmReq) => void;
   closeConfirm: () => void;
-  setChatOpen: (open: boolean) => void;
 }
 
 let seq = 0;
 
-/** Avisos, confirmaciones y chat: estado de pantalla que no se guarda. */
+/** Estado de pantalla: avisos, diálogos y filtros. Nunca va a la API. */
 export const useUiStore = create<UiState>()((set) => ({
   toast: null,
   confirm: null,
-  chatOpen: false,
+  tab: "todos",
+  q: "",
+  adding: false,
+  setTab: (tab) => set({ tab }),
+  setQ: (q) => set({ q }),
+  setAdding: (adding) => set({ adding }),
   showToast: (msg, undo) => set({ toast: { id: ++seq, msg, undo } }),
   hideToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : s)),
   askConfirm: (confirm) => set({ confirm }),
   closeConfirm: () => set({ confirm: null }),
-  setChatOpen: (chatOpen) => set({ chatOpen }),
 }));
 
 /** Atajo para usar fuera de componentes (handlers, acciones). */

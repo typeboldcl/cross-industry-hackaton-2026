@@ -1,11 +1,11 @@
 import type { Auditoria, Instalacion } from "@hackaton/contracts";
 import { Link, useNavigate } from "react-router";
+import { api, attempt, useAudits } from "../api";
 import { Icon } from "../components/Icon";
 import { Ring } from "../components/ui";
 import { INSTALACIONES } from "../data/seed";
 import { activeReqs, auditsOf, stats } from "../domain/auditoria";
 import { pctColor, plural } from "../domain/format";
-import { useAuditStore } from "../store/useAuditStore";
 import { askConfirm, toast } from "../store/useUiStore";
 
 /** Resumen de un centro: última auditoría con requisitos (o datos ficticios si no hay). */
@@ -18,9 +18,7 @@ function resumen(i: Instalacion, audits: Auditoria[]) {
 }
 
 export function Inicio() {
-  const audits = useAuditStore((s) => s.audits);
-  const loadDemo = useAuditStore((s) => s.loadDemo);
-  const reset = useAuditStore((s) => s.reset);
+  const audits = useAudits();
   const navigate = useNavigate();
 
   return (
@@ -74,11 +72,13 @@ export function Inicio() {
           </div>
           <button
             className="btn sm"
-            onClick={() => {
-              loadDemo();
-              toast("Ejemplo cargado: 2 auditorías en Piscicultura Aucha");
-              void navigate("/centros/aucha");
-            }}
+            onClick={() =>
+              void attempt(api.demo.load()).then((ok) => {
+                if (!ok) return;
+                toast("Ejemplo cargado: 2 auditorías en Piscicultura Aucha");
+                void navigate("/centros/aucha");
+              })
+            }
           >
             Cargar ejemplo
           </button>
@@ -94,10 +94,10 @@ export function Inicio() {
                 "Se borrarán todas las auditorías, requisitos y evidencias guardados en este dispositivo.",
               ok: "Borrar todo",
               peligro: true,
-              onOk: () => {
-                reset();
-                toast("Prototipo reiniciado");
-              },
+              onOk: () =>
+                void attempt(api.demo.reset()).then(
+                  (ok) => ok && toast("Prototipo reiniciado"),
+                ),
             })
           }
         >

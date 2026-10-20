@@ -13,7 +13,7 @@ import { activeReqs, auditsOf, stats, temasDe } from "../domain/auditoria";
 import { STATUS } from "../domain/constants";
 import { fmtDate, pctColor, pctLabel } from "../domain/format";
 import { useAuditCtx } from "../hooks/useAuditCtx";
-import { useAuditStore } from "../store/useAuditStore";
+import { api, attempt, useAudits } from "../api";
 import { askConfirm, toast } from "../store/useUiStore";
 
 const fila = {
@@ -25,8 +25,7 @@ const fila = {
 
 export function Panel() {
   const a = useAuditCtx();
-  const audits = useAuditStore((s) => s.audits);
-  const closeAudit = useAuditStore((s) => s.closeAudit);
+  const audits = useAudits();
   const list = activeReqs(a);
   const st = stats(list);
   const inst = instById(a.inst);
@@ -96,10 +95,10 @@ export function Panel() {
                 texto:
                   "Quedará en solo lectura dentro del historial del centro. Podrás revisar sus resultados y evidencias, pero no modificarlos.",
                 ok: "Cerrar auditoría",
-                onOk: () => {
-                  closeAudit(a.id);
-                  toast("Auditoría cerrada");
-                },
+                onOk: () =>
+                  void attempt(api.audits.close(a.id)).then(
+                    (ok) => ok && toast("Auditoría cerrada"),
+                  ),
               })
             }
           >

@@ -4,13 +4,12 @@ import { Icon } from "../components/Icon";
 import { instById } from "../components/ui";
 import { INST_ICON, TIPOS_AUDITORIA } from "../domain/constants";
 import { today } from "../domain/format";
-import { useAuditStore } from "../store/useAuditStore";
+import { api, run } from "../api";
 import { toast } from "../store/useUiStore";
 
 export function Nueva() {
   const { centroId } = useParams();
   const navigate = useNavigate();
-  const createAudit = useAuditStore((s) => s.createAudit);
   const [tipo, setTipo] = useState(TIPOS_AUDITORIA[0]);
   const [nombre, setNombre] = useState(
     () =>
@@ -21,19 +20,22 @@ export function Nueva() {
   const inst = instById(centroId);
   if (!inst) return <Navigate to="/" replace />;
 
-  const crear = () => {
+  const crear = async () => {
     if (!nombre.trim()) {
       toast("Ponle un nombre a la auditoría");
       return;
     }
-    const id = createAudit({
-      inst: inst.id,
-      nombre: nombre.trim(),
-      tipo,
-      fecha: fecha || today(),
-    });
+    const audit = await run(
+      api.audits.create({
+        inst: inst.id,
+        nombre: nombre.trim(),
+        tipo,
+        fecha: fecha || today(),
+      }),
+    );
+    if (!audit) return;
     toast("Auditoría creada");
-    void navigate(`/auditorias/${id}/preparar`);
+    void navigate(`/auditorias/${audit.id}/preparar`);
   };
 
   return (
@@ -93,7 +95,7 @@ export function Nueva() {
         <Link className="btn" to={`/centros/${inst.id}`}>
           Cancelar
         </Link>
-        <button className="btn primary grow" onClick={crear}>
+        <button className="btn primary grow" onClick={() => void crear()}>
           Crear y preparar
         </button>
       </div>

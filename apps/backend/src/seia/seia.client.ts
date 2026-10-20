@@ -12,6 +12,8 @@ import {
 import { ENV, type Env } from "../common/config/env.js";
 import {
   parseExpedienteDocuments,
+  parsePertinenciaProcessId,
+  parsePertinenciaResolution,
   parsePertinencias,
   parseProjects,
 } from "./seia.parsers.js";
@@ -20,12 +22,22 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
 const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
-const ALLOWED_HOSTS = new Set(["seia.sea.gob.cl", "infofirma.sea.gob.cl"]);
+const PERTINENCIA_BASE_URL = "https://pertinencia.sea.gob.cl";
+const ALLOWED_HOSTS = new Set([
+  "seia.sea.gob.cl",
+  "infofirma.sea.gob.cl",
+  "pertinencia.sea.gob.cl",
+]);
 const UNAVAILABLE = "No se pudo consultar el SEIA. Inténtalo nuevamente.";
 
 export interface SeiaPage<T> {
   items: T[];
   total: number;
+}
+
+export interface PertinenciaPdf {
+  pdfUrl: string;
+  title: string;
 }
 
 export interface DownloadedPdf {
@@ -73,6 +85,46 @@ export class SeiaClient {
       },
     );
     return parsePertinencias(parseJson(body));
+  }
+
+  async resolvePertinenciaPdf(pertinenciaId: string): Promise<PertinenciaPdf> {
+    const processId = parsePertinenciaProcessId(
+      parseJson(
+        await this.fetchText(
+          new URL("/api/public/buscarCp", PERTINENCIA_BASE_URL),
+          { pertinenciaFilter: { id: pertinenciaId } },
+        ),
+      ),
+    );
+    if (!processId) {
+      throw new BadRequestException(
+        `La pertinencia ${pertinenciaId} no existe en el SEA.`,
+      );
+    }
+
+    const resolution = parsePertinenciaResolution(
+      parseJson(
+        await this.fetchText(
+          new URL(
+            `/api/public/expediente/getPertinenciaFull/${encodeURIComponent(processId)}`,
+            PERTINENCIA_BASE_URL,
+          ),
+        ),
+      ),
+    );
+    if (!resolution) {
+      throw new BadRequestException(
+        `La pertinencia ${pertinenciaId} todavía no tiene una resolución publicada.`,
+      );
+    }
+
+    return {
+      pdfUrl: new URL(
+        `/api/public/documentos/getDocumentoPDF/${encodeURIComponent(resolution.archiveId)}`,
+        PERTINENCIA_BASE_URL,
+      ).toString(),
+      title: `${resolution.name} · ${resolution.title}`,
+    };
   }
 
   async downloadPdf(url: string): Promise<DownloadedPdf> {
@@ -123,7 +175,7 @@ export class SeiaClient {
     }
     if (url.protocol !== "https:" || !ALLOWED_HOSTS.has(url.hostname)) {
       throw new BadRequestException(
-        "Solo se pueden importar documentos desde seia.sea.gob.cl o infofirma.sea.gob.cl.",
+        "Solo se pueden importar documentos desde seia.sea.gob.cl, infofirma.sea.gob.cl o pertinencia.sea.gob.cl.",
       );
     }
     return url;
@@ -133,17 +185,34 @@ export class SeiaClient {
     path: string,
     form?: Record<string, string>,
   ): Promise<string> {
+    const response = await this.send(new URL(path, this.env.seiaBaseUrl), {
+      method: form ? "POST" : "GET",
+      headers: form
+        ? { "content-type": "application/x-www-form-urlencoded" }
+        : undefined,
+      body: form ? new URLSearchParams(form) : undefined,
+    });
+    return new TextDecoder("latin1").decode(response);
+  }
+
+  private async fetchText(url: URL, json?: unknown): Promise<string> {
+    const response = await this.send(url, {
+      method: json === undefined ? "GET" : "POST",
+      headers:
+        json === undefined ? undefined : { "content-type": "application/json" },
+      body: json === undefined ? undefined : JSON.stringify(json),
+    });
+    return new TextDecoder().decode(response);
+  }
+
+  private async send(url: URL, init: RequestInit): Promise<ArrayBuffer> {
     try {
-      const response = await fetch(new URL(path, this.env.seiaBaseUrl), {
-        method: form ? "POST" : "GET",
-        headers: form
-          ? { "content-type": "application/x-www-form-urlencoded" }
-          : undefined,
-        body: form ? new URLSearchParams(form) : undefined,
+      const response = await fetch(url, {
+        ...init,
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       if (!response.ok) throw new BadGatewayException(UNAVAILABLE);
-      return new TextDecoder("latin1").decode(await response.arrayBuffer());
+      return await response.arrayBuffer();
     } catch (error) {
       if (error instanceof BadGatewayException) throw error;
       throw new BadGatewayException(UNAVAILABLE);

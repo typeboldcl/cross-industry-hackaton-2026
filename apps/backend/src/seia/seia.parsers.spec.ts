@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import { SeiaClient } from "./seia.client.js";
 import {
   parseExpedienteDocuments,
+  parsePertinenciaProcessId,
+  parsePertinenciaResolution,
   parsePertinencias,
   parseProjects,
+  pertinenciaIdFromUrl,
 } from "./seia.parsers.js";
 
 const BASE = "https://seia.sea.gob.cl";
@@ -162,4 +165,74 @@ describe.skipIf(!process.env.LIVE_SEIA)("SEIA live", () => {
       "https://seia.sea.gob.cl/archivos/2024/09/30/RCA_N_202410001185__Piscicultura_Aucha_.pdf",
     );
   }, 20_000);
+});
+
+describe("pertinencia downloads", () => {
+  it("recognizes the expediente link of a NEW pertinencia", () => {
+    expect(
+      pertinenciaIdFromUrl(
+        new URL(
+          "https://pertinencia.sea.gob.cl/api/public/expediente/PERTI-2025-2767",
+        ),
+      ),
+    ).toBe("PERTI-2025-2767");
+    expect(
+      pertinenciaIdFromUrl(
+        new URL(
+          "https://seia.sea.gob.cl/api/public/expediente/PERTI-2025-2767",
+        ),
+      ),
+    ).toBeNull();
+    expect(
+      pertinenciaIdFromUrl(
+        new URL("https://pertinencia.sea.gob.cl/api/public/expediente/x"),
+      ),
+    ).toBeNull();
+  });
+
+  it("reads the process id of the search result", () => {
+    expect(parsePertinenciaProcessId([{ qidProcess: "ABC" }])).toBe("ABC");
+    expect(parsePertinenciaProcessId([])).toBeNull();
+    expect(() => parsePertinenciaProcessId({})).toThrow(BadGatewayException);
+  });
+
+  it("picks the latest resolution stored as an archive", () => {
+    const resolution = parsePertinenciaResolution({
+      pertinencia: { name: "Cambio de layout, Piscicultura Aucha" },
+      documentos: [
+        {
+          name: "Consulta de Pertinencia",
+          qidArchive:
+            "https://infofirma.sea.gob.cl/DocumentosSEA/MostrarDocumento?docId=aa",
+        },
+        {
+          name: "Resolución resuelve no ingreso modificación de proyecto",
+          qidArchive: "6E26C2F4-6D5A-4053-B9BB-A29028C5C7B4",
+        },
+        {
+          name: "Resolución resuelve no ingreso modificación de proyecto",
+          qidArchive: "4876EB20-ED1D-4D04-9084-8F5C4EC3B688",
+        },
+        {
+          name: "Calendario proceso",
+          qidArchive: "B2886FDD-3A49-45D9-A7C4-DACD03E5BA17",
+        },
+      ],
+    });
+    expect(resolution).toEqual({
+      name: "Resolución resuelve no ingreso modificación de proyecto",
+      title: "Cambio de layout, Piscicultura Aucha",
+      archiveId: "4876EB20-ED1D-4D04-9084-8F5C4EC3B688",
+    });
+  });
+
+  it("returns null while the pertinencia has no resolution", () => {
+    expect(
+      parsePertinenciaResolution({
+        documentos: [
+          { name: "Consulta de Pertinencia", qidArchive: "https://x" },
+        ],
+      }),
+    ).toBeNull();
+  });
 });

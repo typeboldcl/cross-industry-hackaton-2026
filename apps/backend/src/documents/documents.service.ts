@@ -23,6 +23,7 @@ import {
 } from "../processing/processing-dispatcher.js";
 import { STORAGE, type StorageService } from "../storage/storage.service.js";
 import { SeiaClient } from "../seia/seia.client.js";
+import { pertinenciaIdFromUrl } from "../seia/seia.parsers.js";
 import { numberFromFilename } from "./document-number.js";
 import { DocumentEntity } from "./entities/document.entity.js";
 
@@ -67,7 +68,7 @@ export class DocumentsService {
     file: UploadedPdf,
     kind: DocumentKind,
     title?: string,
-    source?: { origin: "fetched"; url: string },
+    source?: { origin: "fetched"; url: string; number?: string },
   ): Promise<UploadResult> {
     await this.assertFacility(facilityId);
 
@@ -78,6 +79,9 @@ export class DocumentsService {
     const sha256 = sha256Hex(file.buffer);
     const existing = await this.documents.findOneBy({ sha256 });
     if (existing) {
+      if (source?.number && !existing.number) {
+        await this.documents.update(existing.id, { number: source.number });
+      }
       return { document: await this.detail(existing.id), created: false };
     }
 
@@ -95,7 +99,7 @@ export class DocumentsService {
       await this.documents.insert({
         id,
         facilityId,
-        number: numberFromFilename(filename),
+        number: source?.number ?? numberFromFilename(filename),
         sha256,
         storageKey,
         mime: "application/pdf",
@@ -122,19 +126,23 @@ export class DocumentsService {
     kind: DocumentKind,
     title?: string,
   ): Promise<UploadResult> {
-    this.seia.assertAllowedUrl(url);
+    const target = this.seia.assertAllowedUrl(url);
     await this.assertFacility(facilityId);
-    const pdf = await this.seia.downloadPdf(url);
+    const pertinenciaId = pertinenciaIdFromUrl(target);
+    const pertinencia = pertinenciaId
+      ? await this.seia.resolvePertinenciaPdf(pertinenciaId)
+      : null;
+    const pdf = await this.seia.downloadPdf(pertinencia?.pdfUrl ?? url);
     return this.upload(
       facilityId,
       {
         buffer: pdf.buffer,
-        originalname: pdf.filename,
+        originalname: pertinenciaId ? `${pertinenciaId}.pdf` : pdf.filename,
         mimetype: "application/pdf",
       },
       kind,
-      title,
-      { origin: "fetched", url },
+      title ?? pertinencia?.title,
+      { origin: "fetched", url, number: pertinenciaId ?? undefined },
     );
   }
 

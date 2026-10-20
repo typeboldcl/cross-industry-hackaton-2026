@@ -76,6 +76,49 @@ export function parsePertinencias(payload: unknown): {
   };
 }
 
+const PERTINENCIA_ID = /^PERTI-\d{4}-\d+$/;
+const ARCHIVE_GUID = /^[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$/i;
+
+export function pertinenciaIdFromUrl(url: URL): string | null {
+  if (url.hostname !== "pertinencia.sea.gob.cl") return null;
+  const id = /^\/api\/public\/expediente\/([^/]+)\/?$/.exec(url.pathname)?.[1];
+  return id && PERTINENCIA_ID.test(id) ? id : null;
+}
+
+export function parsePertinenciaProcessId(payload: unknown): string | null {
+  if (!Array.isArray(payload)) throw new BadGatewayException(SHAPE_ERROR);
+  const first: unknown = payload[0];
+  return isRecord(first) ? optionalText(first, "qidProcess") : null;
+}
+
+export interface PertinenciaResolution {
+  name: string;
+  title: string;
+  archiveId: string;
+}
+
+export function parsePertinenciaResolution(
+  payload: unknown,
+): PertinenciaResolution | null {
+  if (!isRecord(payload) || !Array.isArray(payload.documentos)) {
+    throw new BadGatewayException(SHAPE_ERROR);
+  }
+  const resolutions = payload.documentos.filter(
+    (document): document is Record<string, unknown> =>
+      isRecord(document) &&
+      /^resoluci[oó]n/i.test(optionalText(document, "name") ?? "") &&
+      ARCHIVE_GUID.test(optionalText(document, "qidArchive") ?? ""),
+  );
+  const latest = resolutions.at(-1);
+  if (!latest) return null;
+  const pertinencia = isRecord(payload.pertinencia) ? payload.pertinencia : {};
+  return {
+    name: requiredText(latest, "name"),
+    title: optionalText(pertinencia, "name") ?? requiredText(latest, "name"),
+    archiveId: requiredText(latest, "qidArchive"),
+  };
+}
+
 export function parseExpedienteDocuments(
   html: string,
   baseUrl: string,

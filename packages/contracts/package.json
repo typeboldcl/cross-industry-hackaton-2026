@@ -1,0 +1,23 @@
+{
+  "name": "@hackaton/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HTTP contract types shared between the backend and the frontend",
+  "license": "UNLICENSED",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}

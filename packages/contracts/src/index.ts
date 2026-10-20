@@ -40,6 +40,7 @@ export type {
   CategoryNotApplicableRequest,
   CreateAuditRequest,
   Evidence,
+  HistoryEntry,
   NaReason,
   PublishAuditRequest,
 } from "./audits.js";

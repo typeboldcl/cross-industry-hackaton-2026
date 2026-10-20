@@ -56,6 +56,12 @@ export interface AuditSummary {
   itemCounts: Record<AuditResult, number>;
 }
 
+export interface HistoryEntry {
+  at: string;
+  actorName: string;
+  summary: string;
+}
+
 export interface AuditItem {
   id: string;
   auditId: string;
@@ -68,6 +74,7 @@ export interface AuditItem {
   assessedByName: string | null;
   assessedAt: string | null;
   evidence: Evidence[];
+  history: HistoryEntry[];
 }
 
 export interface AuditDetail extends AuditSummary {

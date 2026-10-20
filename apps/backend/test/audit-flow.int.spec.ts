@@ -115,9 +115,20 @@ describe("audit flow", () => {
       .get(`/api/audits/${audit.id}`)
       .expect(200);
     expect(detail.status).toBe("published");
+    const assessedItem = detail.items.find(
+      (i: { id: string }) => i.id === item.id,
+    );
+    expect(assessedItem.evidence).toHaveLength(1);
     expect(
-      detail.items.find((i: { id: string }) => i.id === item.id).evidence,
-    ).toHaveLength(1);
+      assessedItem.history.map((h: { summary: string }) => h.summary),
+    ).toEqual(
+      expect.arrayContaining([
+        "Validado",
+        "Incluido en «Auditoría interna Q4 2026»",
+        "Evidencia agregada: foto.jpg",
+        "Marcado como «No cumple»: Falta el informe de agosto",
+      ]),
+    );
 
     await request(app.getHttpServer())
       .post(`/api/audits/${audit.id}/close`)

@@ -4,6 +4,7 @@ import type {
   AuditResult,
   AuditSummary,
   Evidence,
+  HistoryEntry,
   NaReason,
 } from "@hackaton/contracts";
 import {
@@ -436,6 +437,17 @@ export class AuditsService {
       .where("e.audit_item_id IN (:...ids)", { ids: items.map((i) => i.id) })
       .orderBy("e.created_at")
       .getMany();
+    const audits = await this.db
+      .getRepository(AuditEntity)
+      .createQueryBuilder("a")
+      .where("a.id IN (:...ids)", {
+        ids: [...new Set(items.map((i) => i.auditId))],
+      })
+      .getMany();
+    const origins: { id: string; origin: string }[] = await this.db.query(
+      `SELECT id, origin FROM obligation WHERE id = ANY($1::uuid[])`,
+      [[...new Set(versions.map((v) => v.obligationId))]],
+    );
 
     return items.flatMap((item) => {
       const version = versions.find((v) => v.id === item.obligationVersionId);
@@ -455,6 +467,14 @@ export class AuditsService {
           evidence: evidence
             .filter((e) => e.auditItemId === item.id)
             .map(toEvidence),
+          history: historyOf(
+            item,
+            version,
+            origins.find((o) => o.id === version.obligationId)?.origin ??
+              "extracted",
+            audits.find((a) => a.id === item.auditId),
+            evidence.filter((e) => e.auditItemId === item.id),
+          ),
         },
       ];
     });
@@ -514,6 +534,67 @@ export class AuditsService {
   }
 }
 
+const RESULT_LABELS: Record<AuditResult, string> = {
+  compliant: "Cumple",
+  non_compliant: "No cumple",
+  not_applicable: "No aplica",
+  pending: "Pendiente",
+};
+
+// Built from the stamps each step already leaves; intermediate changes (a result marked twice) need an audit_log, which is post-MVP.
+function historyOf(
+  item: AuditItemEntity,
+  version: AuditItem["version"],
+  origin: string,
+  audit: AuditEntity | undefined,
+  evidence: EvidenceEntity[],
+): HistoryEntry[] {
+  const entries: HistoryEntry[] = [
+    {
+      at: version.createdAt,
+      actorName:
+        origin === "manual"
+          ? (version.validatedBy ?? "Responsable")
+          : "Sistema",
+      summary:
+        origin === "manual"
+          ? "Agregado manualmente"
+          : "Propuesto por la extracción del documento",
+    },
+  ];
+  if (version.validatedAt) {
+    entries.push({
+      at: version.validatedAt,
+      actorName: version.validatedBy ?? "Responsable",
+      summary: version.edited ? "Editado y validado" : "Validado",
+    });
+  }
+  if (audit?.publishedAt) {
+    entries.push({
+      at: audit.publishedAt.toISOString(),
+      actorName: audit.validatedByName ?? "Responsable",
+      summary: `Incluido en «${audit.title}»`,
+    });
+  }
+  for (const e of evidence) {
+    entries.push({
+      at: e.createdAt.toISOString(),
+      actorName: e.uploadedByName ?? "Equipo en terreno",
+      summary: `Evidencia agregada: ${e.filename ?? "archivo"}`,
+    });
+  }
+  if (item.assessedAt && item.result !== "pending") {
+    const detail =
+      item.result === "not_applicable" ? item.naReason : item.notes;
+    entries.push({
+      at: item.assessedAt.toISOString(),
+      actorName: item.assessedByName ?? "Equipo en terreno",
+      summary: `Marcado como «${RESULT_LABELS[item.result]}»${detail ? `: ${detail}` : ""}`,
+    });
+  }
+  return entries.sort((a, b) => a.at.localeCompare(b.at));
+}
+
 function emptyCounts(): Record<AuditResult, number> {
   return Object.fromEntries(RESULTS.map((result) => [result, 0])) as Record<
     AuditResult,
@@ -537,6 +618,7 @@ function manualPreview(
     assessedByName: null,
     assessedAt: null,
     evidence: [],
+    history: [],
   };
 }
 

@@ -20,6 +20,7 @@ export interface LlmRunRequest<T> {
   input: unknown;
   schema: z.ZodType<T>;
   maxTokens?: number;
+  queue?: string;
 }
 
 export interface LlmRunResult<T> {
@@ -77,8 +78,9 @@ export class LlmService {
     }
 
     const slots = request.kind === "answer" ? this.interactive : this.semaphore;
-    const { output, tokensIn, tokensOut } = await slots.run(() =>
-      this.callWithCorrection(request),
+    const { output, tokensIn, tokensOut } = await slots.run(
+      () => this.callWithCorrection(request),
+      request.queue,
     );
 
     const saved = await this.runs

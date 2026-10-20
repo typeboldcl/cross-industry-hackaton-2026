@@ -58,6 +58,7 @@ export class ExtractionService {
         textSha256: sha256Hex(section.text),
       },
       schema: extractionOutputSchema,
+      queue: document.id,
     });
 
     const draftsCreated = await this.db.transaction((manager) =>

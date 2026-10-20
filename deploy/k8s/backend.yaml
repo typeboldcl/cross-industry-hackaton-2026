@@ -17,6 +17,8 @@ spec:
       labels:
         app: backend
     spec:
+      imagePullSecrets:
+        - name: default-secret
       containers:
         - name: backend
           image: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-backend:<tag>
@@ -64,7 +66,7 @@ metadata:
   name: backend
   namespace: hackaton
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: backend
   ports:

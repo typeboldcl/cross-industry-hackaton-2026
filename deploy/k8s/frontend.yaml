@@ -13,6 +13,8 @@ spec:
       labels:
         app: frontend
     spec:
+      imagePullSecrets:
+        - name: default-secret
       containers:
         - name: frontend
           image: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-frontend:latest
@@ -43,7 +45,7 @@ metadata:
   name: frontend
   namespace: hackaton
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: frontend
   ports:

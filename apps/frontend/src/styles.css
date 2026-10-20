@@ -515,6 +515,7 @@ textarea {
   padding: 18px;
 }
 .hero h2 {
+  color: inherit;
   margin: 0 0 4px;
   font-size: 21px;
 }

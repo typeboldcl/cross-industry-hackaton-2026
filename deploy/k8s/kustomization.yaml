@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hackaton
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - backend.yaml
+  - ingress.yaml
+  - ollama.yaml
+images:
+  - name: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-backend
+    newName: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-backend
+    newTag: latest
+  - name: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-ollama
+    newName: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-ollama
+    newTag: latest

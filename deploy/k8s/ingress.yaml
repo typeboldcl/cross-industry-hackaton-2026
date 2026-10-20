@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend
+  namespace: hackaton
+  annotations:
+    kubernetes.io/elb.id: <elb-id>
+    kubernetes.io/elb.port: "80"
+spec:
+  ingressClassName: cce
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 80

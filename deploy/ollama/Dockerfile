@@ -1,0 +1,5 @@
+FROM ollama/ollama:latest
+RUN ollama serve & \
+    until ollama list >/dev/null 2>&1; do sleep 1; done; \
+    ollama pull qwen3-embedding:0.6b
+EXPOSE 11434

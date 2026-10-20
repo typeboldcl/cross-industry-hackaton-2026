@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+reference/
+docs/
+deploy/
+apps/frontend
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example

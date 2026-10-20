@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: hackaton
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-backend:<tag>
+          command: ["node", "dist/common/database/migrate.js"]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+          volumeMounts:
+            - name: rds-ca
+              mountPath: /etc/rds/ca.pem
+              subPath: ca.pem
+              readOnly: true
+      volumes:
+        - name: rds-ca
+          configMap:
+            name: rds-ca

@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: ollama
-          image: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-ollama:<tag>
+          image: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-ollama:<tag>
           ports:
             - name: http
               containerPort: 11434

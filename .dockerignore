@@ -5,7 +5,6 @@
 reference/
 docs/
 deploy/
-apps/frontend
 .env
 .env.*
 !.env.example

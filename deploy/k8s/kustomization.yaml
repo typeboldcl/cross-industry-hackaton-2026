@@ -5,12 +5,16 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - backend.yaml
+  - frontend.yaml
   - ingress.yaml
   - ollama.yaml
 images:
-  - name: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-backend
-    newName: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-backend
+  - name: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-frontend
+    newName: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-frontend
     newTag: latest
-  - name: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-ollama
-    newName: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-ollama
+  - name: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-backend
+    newName: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-backend
+    newTag: latest
+  - name: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-ollama
+    newName: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-ollama
     newTag: latest

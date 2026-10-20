@@ -4,6 +4,6 @@ namespace: hackaton
 resources:
   - job.yaml
 images:
-  - name: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-backend
-    newName: swr.la-south-2.myhuaweicloud.com/<org>/hackaton-backend
+  - name: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-backend
+    newName: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-backend
     newTag: latest

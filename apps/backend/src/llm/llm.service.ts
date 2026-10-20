@@ -36,6 +36,8 @@ const DEFAULT_MAX_TOKENS = 8_000;
 export class LlmService {
   private readonly logger = new Logger("Llm");
   private readonly semaphore: Semaphore;
+  // Interactive answers get their own slots so a long document extraction never makes the chat wait.
+  private readonly interactive = new Semaphore(2);
 
   constructor(
     @Inject(ENV) env: Env,
@@ -74,7 +76,8 @@ export class LlmService {
       };
     }
 
-    const { output, tokensIn, tokensOut } = await this.semaphore.run(() =>
+    const slots = request.kind === "answer" ? this.interactive : this.semaphore;
+    const { output, tokensIn, tokensOut } = await slots.run(() =>
       this.callWithCorrection(request),
     );
 

@@ -1,5 +1,5 @@
 import type { Section } from "./sectioner.js";
-import { filterSections } from "./section-filter.js";
+import { filterSections, prioritizeSections } from "./section-filter.js";
 
 function section(key: string): Section {
   const [kind] = key.split(" ");
@@ -75,4 +75,34 @@ describe("filterSections", () => {
       expect(filterSections(kind, sections)).toEqual(sections);
     },
   );
+});
+
+describe("prioritizeSections", () => {
+  it("puts chapter 8 tablas and late considerandos first, RESUELVO last", () => {
+    const make = (key: string, kind: Section["kind"]): Section => ({
+      key,
+      kind,
+      title: "",
+      text: "",
+      pageFrom: 1,
+      pageTo: 1,
+      charStart: 0,
+      charEnd: 0,
+      part: 1,
+      partsTotal: 1,
+    });
+    const ordered = prioritizeSections([
+      make("resuelvo 1", "resuelvo"),
+      make("tabla 6.1.1", "tabla"),
+      make("considerando 12", "considerando"),
+      make("tabla 8.15", "tabla"),
+    ]).map((s) => s.key);
+
+    expect(ordered).toEqual([
+      "tabla 8.15",
+      "considerando 12",
+      "tabla 6.1.1",
+      "resuelvo 1",
+    ]);
+  });
 });

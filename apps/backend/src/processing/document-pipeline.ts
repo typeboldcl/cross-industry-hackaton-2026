@@ -4,7 +4,10 @@ import type { DataSource } from "typeorm";
 import { numberFromText } from "../documents/document-number.js";
 import { DocumentEntity } from "../documents/entities/document.entity.js";
 import { extractPages } from "../documents/pdf-text.js";
-import { filterSections } from "../documents/section-filter.js";
+import {
+  filterSections,
+  prioritizeSections,
+} from "../documents/section-filter.js";
 import { sectionDocument } from "../documents/sectioner.js";
 import { ExtractionService } from "../extraction/extraction.service.js";
 import { STORAGE, type StorageService } from "../storage/storage.service.js";
@@ -26,7 +29,9 @@ export class DocumentPipeline {
     try {
       const pages = await this.pagesOf(document);
       const number = document.number ?? numberFromText(pages);
-      const sections = filterSections(document.kind, sectionDocument(pages));
+      const sections = prioritizeSections(
+        filterSections(document.kind, sectionDocument(pages)),
+      );
 
       await this.db.query(
         `UPDATE document SET number = $2, sections_total = $3, sections_done = 0, text_extracted_at = now() WHERE id = $1`,

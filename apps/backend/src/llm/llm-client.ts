@@ -41,18 +41,29 @@ export class OrbitLlmClient implements LlmClient {
     });
   }
 
+  // Streaming keeps bytes flowing while the model reasons, so Orbit's gateway does not cut long calls with a 504.
   async complete(request: CompletionRequest): Promise<Completion> {
-    const response = await this.client.chat.completions.create({
+    const stream = await this.client.chat.completions.create({
       model: request.model,
       messages: request.messages,
       max_tokens: request.maxTokens,
       response_format: { type: "json_object" },
+      stream: true,
+      stream_options: { include_usage: true },
     });
 
-    return {
-      content: response.choices[0]?.message.content ?? "",
-      tokensIn: response.usage?.prompt_tokens ?? null,
-      tokensOut: response.usage?.completion_tokens ?? null,
-    };
+    let content = "";
+    let tokensIn: number | null = null;
+    let tokensOut: number | null = null;
+
+    for await (const chunk of stream) {
+      content += chunk.choices[0]?.delta?.content ?? "";
+      if (chunk.usage) {
+        tokensIn = chunk.usage.prompt_tokens;
+        tokensOut = chunk.usage.completion_tokens;
+      }
+    }
+
+    return { content, tokensIn, tokensOut };
   }
 }

@@ -11,6 +11,8 @@ spec:
         app: migrate
     spec:
       restartPolicy: Never
+      imagePullSecrets:
+        - name: default-secret
       containers:
         - name: migrate
           image: swr.la-south-2.myhuaweicloud.com/hackaton/hackaton-backend:<tag>

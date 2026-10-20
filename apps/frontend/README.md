@@ -2,39 +2,62 @@
 
 Frontend for challenge 4: automating environmental and permit audits per installation.
 
-## `prototipo/`
+It is a React app (Vite + TypeScript) ported from the HTML prototype in [`prototipo/`](prototipo/), which stays in the repo as the reference for the agreed flow. [`prototipo/SISTEMA.md`](prototipo/SISTEMA.md) describes how the system works (in Spanish): flow, screens, states, data model, the extraction contract, offline behaviour and what is mocked.
 
-A clickable, mobile-first prototype in a single static HTML file (no build, no dependencies), styled with Invermar's logo (`prototipo/assets/invermar-logo.png`), the colour palette from invermar.cl and the Montserrat font. It is here to agree on the flow before porting it to React; once that happens this folder becomes a workspace package with its own `package.json`.
+## Running it
 
-Open `prototipo/index.html` directly in a browser. Progress is stored in the browser's `localStorage`; use "Reiniciar prototipo" on the Centros screen to reset it, or "Cargar ejemplo" to load Piscicultura Aucha with two audits (Q3 closed, Q4 in progress on site).
+Needs Node 24+ and pnpm (`corepack enable`). From the repo root:
 
-[`prototipo/SISTEMA.md`](prototipo/SISTEMA.md) describes how the system works and how it is put together (in Spanish): flow, screens, states, data model, the extraction contract, offline behaviour and what is mocked.
+```bash
+pnpm install
+pnpm dev:frontend
+```
 
-### Structure
+Then open http://localhost:5173. Other scripts, run from `apps/frontend` or with `pnpm --filter hackaton-frontend <script>`: `build`, `preview`, `typecheck`, `lint` and `test`.
 
-Centro (installation) → Auditorías (several per centro, in progress and closed) → Requisitos → result on site (status, notes, evidence, history).
+Progress is stored in the browser's `localStorage` (key `auditorias-react-v1`), so the app works offline. Use "Reiniciar prototipo" on the Centros screen to reset it, or "Cargar ejemplo" to load Piscicultura Aucha with two audits (Q3 closed, Q4 in progress on site).
 
-### Screens
+## Structure
 
-- **Centros** (home): pick the installation to audit; each card shows its latest compliance and how many audits it has.
-- **Auditorías del centro**: "+ Crear nueva auditoría", audits in progress and closed, the centro's documents and the alerts found across them.
-- **Crear nueva auditoría**: type, name and date; the centro comes locked from the previous screen.
-- **Preparar** (before visiting the site): audit details, load the RCA and sectoral resolutions, load pertinencias, generate requirements, then have a responsible person validate them (pick themes, edit, discard or add requirements the analysis missed) and publish.
-- **Terreno**: search and Todos / Llenados / Pendientes tabs that stay pinned while scrolling, requirements numbered like the paper sheet (1-a, 1-b…) and grouped by theme, ordered pending → Cumple → No cumple → N/A, status (Cumple / No cumple / No aplica, matching Invermar's current SÍ / NO / N/A sheet) set straight from each pending row (marked ones turn into a coloured card and are edited from the detail), notes, photo and file evidence, and a per-requirement change history. No cumple requires a note (evidence is optional), No aplica requires a reason, a whole theme can be marked No aplica, and every change can be undone for a few seconds. Works offline. Closed audits are read-only.
-- **Panel**: compliance per theme, upcoming due dates, findings, the centro's audit history, and "Cerrar auditoría".
-- **Chat**: answers questions about the installation's requirements and always cites the source document.
+```
+src/
+  main.tsx, App.tsx     entry point and routes (hash router)
+  styles.css            styles ported 1:1 from the prototype (Invermar palette)
+  data/seed.ts          example data and the 35 requirements extracted by hand
+  domain/               pure logic: stats, sheet numbering, factories, chat, evidence
+  store/                Zustand stores: audits (persisted) and UI (toasts, dialogs, chat)
+  hooks/                theme, connectivity/sync, current audit
+  components/           top bar, icons, overlays, chat, shared UI pieces
+  views/                one file per screen
+```
 
-Audit states: `sin_preparar` (Borrador) → `en_validacion` → `publicada` (En terreno) → `cerrada`.
+Shared types live in [`@hackaton/contracts`](../../packages/contracts/src/auditoria.ts). `RequisitoExtraido` is the shape the LLM extraction step must return: `{ id, tema, titulo, detalle, fuente: { doc, ref }, frecuencia, evidencia, venc?, rectificado? }`.
 
-The navigation bar (Auditorías · Terreno · Panel) only shows once an audit is open. Preparar is reached from the audit card, not from the bar.
+### Routes
 
-### What is mocked
+| Route                                  | Screen                                                                              |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| `#/`                                   | Centros: pick the installation to audit                                             |
+| `#/centros/:centroId`                  | Audits of the centro, its documents and alerts                                      |
+| `#/centros/:centroId/nueva`            | Create an audit (the centro comes locked)                                           |
+| `#/auditorias/:auditId`                | Opens the screen that matches the audit's status                                    |
+| `#/auditorias/:auditId/preparar`       | 4-step wizard: details, documents, pertinencias, generate and validate requirements |
+| `#/auditorias/:auditId/terreno`        | On-site checklist: Todos / Llenados / Pendientes, quick status per row              |
+| `#/auditorias/:auditId/terreno/:reqId` | Requirement detail: status, notes, evidence, history                                |
+| `#/auditorias/:auditId/panel`          | Compliance panel and "Cerrar auditoría"                                             |
 
-- Requirement generation and the chat do not call an LLM yet. "Generar" loads `REQ_TEMPLATES`, 35 requirements extracted by hand from the Piscicultura Aucha documents (RCA 202410001185 and its rectification, and the SUSPEL and RESPEL sanitary resolutions). The chat matches keywords against that list.
-- Each entry in `REQ_TEMPLATES` has the shape the extraction step should return: `{ tema, titulo, detalle, fuente: { doc, ref }, frecuencia, evidencia, venc?, rectificado? }`. When this moves to the backend, that shape belongs in `packages/contracts`.
-- Offline sync is simulated: changes stay in `localStorage` and are marked as synced when the connection returns.
-- The other two installations have no real documents and use made-up numbers; audits can be created for them, but requirements must be added by hand. Most due dates are examples. The SUSPEL declaration deadline (20 December) comes straight from the resolution.
+Unlike the prototype, the open audit is part of the URL instead of hidden state, so every screen can be linked to directly. The navigation bar (Auditorías · Terreno · Panel) only shows inside an audit.
 
-### Porting to React
+### Rules on site
 
-Each screen is a `view*` function (`viewInicio`, `viewCentro`, `viewNueva`, `viewPreparar`, `viewTerreno`, `viewReq`, `viewPanel`) that renders from a single state object `S`. `S.audits` holds every audit and `A` is the one currently open. User actions are handled in one `data-action` switch. Screens map to components and the actions map to state updates.
+- Status matches Invermar's current SÍ / NO / N/A sheet: Cumple, No cumple, No aplica.
+- No cumple requires a note; evidence (photo or file) is optional. No aplica requires a reason.
+- Requirements are numbered like the paper sheet (1-a, 1-b…). Inside each theme the order is pending → Cumple → No cumple → N/A.
+- A whole theme can be marked No aplica, and every change can be undone for 5 seconds.
+- Compliance = cumple / (cumple + no cumple); N/A does not count.
+
+## What is mocked
+
+- Requirement generation and the chat do not call an LLM yet. "Generar" loads `REQ_TEMPLATES` from `data/seed.ts`, extracted by hand from the Piscicultura Aucha documents (RCA 202410001185 and its rectification, and the SUSPEL and RESPEL sanitary resolutions). The chat matches keywords against that list.
+- Sync is simulated: changes stay in `localStorage` and are marked as synced 1.5 s after the last change while online.
+- The other two installations have no real documents and use made-up numbers; audits can be created for them, but requirements must be added by hand.

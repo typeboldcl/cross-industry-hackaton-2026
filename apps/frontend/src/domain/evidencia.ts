@@ -1,8 +1,8 @@
-import type { Evidencia } from "@hackaton/contracts";
-import { today } from "./format";
-
-/** Reduce la foto a 480 px para guardarla en el teléfono sin llenar el almacenamiento. */
-function resizeImage(file: File): Promise<string | null> {
+/**
+ * Miniatura de 480 px de una foto, en data URL. La usa el modo demo para
+ * mostrar la evidencia sin servidor; el backend real genera la suya.
+ */
+export function toThumbnail(file: File): Promise<string | null> {
   return new Promise((res) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -18,13 +18,4 @@ function resizeImage(file: File): Promise<string | null> {
     img.onerror = () => res(null);
     img.src = url;
   });
-}
-
-export async function toEvidencia(file: File): Promise<Evidencia> {
-  return {
-    nombre: file.name || "foto.jpg",
-    fecha: today(),
-    thumb: file.type.startsWith("image/") ? await resizeImage(file) : null,
-    sync: false,
-  };
 }

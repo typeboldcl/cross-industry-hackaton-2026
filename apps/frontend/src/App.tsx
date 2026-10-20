@@ -1,3 +1,4 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
   createHashRouter,
@@ -8,11 +9,12 @@ import {
   useLocation,
   useParams,
 } from "react-router";
-import { useAudit } from "./api";
+import { queryClient, useAudit, useObligations } from "./api";
 import { Icon } from "./components/Icon";
 import { ConfirmDialog, Toaster } from "./components/Overlays";
 import { TopBar } from "./components/TopBar";
-import { STATUS } from "./domain/constants";
+import { QueryState } from "./components/ui";
+import { AUDIT_STATUS } from "./domain/labels";
 import { type AuditCtx, useAuditCtx } from "./hooks/useAuditCtx";
 import { Centro } from "./views/Centro";
 import { Inicio } from "./views/Inicio";
@@ -43,10 +45,11 @@ function RootLayout() {
 
 const navCls = ({ isActive }: { isActive: boolean }) => (isActive ? "on" : "");
 
-/** Dentro de una auditoría: barra de navegación. */
+/** Dentro de una auditoría: barra de navegación y datos compartidos. */
 function AuditLayout() {
   const { auditId } = useParams();
   const audit = useAudit(auditId);
+  const obligations = useObligations(audit.data?.facilityId);
 
   // La barra solo aparece dentro de una auditoría: antes no se sabe a cuál se entra.
   useEffect(() => {
@@ -54,12 +57,24 @@ function AuditLayout() {
     return () => document.body.classList.remove("has-nav");
   }, []);
 
-  if (!audit) return <Navigate to="/" replace />;
+  if (audit.isLoading || audit.error || !audit.data) {
+    return (
+      <QueryState
+        isLoading={audit.isLoading}
+        error={
+          audit.error ??
+          (audit.data ? null : new Error("Auditoría no encontrada."))
+        }
+        retry={audit.refetch}
+      />
+    );
+  }
+  const a = audit.data;
 
   return (
     <>
       <nav className="nav">
-        <NavLink to={`/centros/${audit.inst}`} className={navCls} end>
+        <NavLink to={`/centros/${a.facilityId}`} className={navCls} end>
           <Icon name="home" />
           <span>Auditorías</span>
         </NavLink>
@@ -72,15 +87,19 @@ function AuditLayout() {
           <span>Panel</span>
         </NavLink>
       </nav>
-      <Outlet context={{ audit } satisfies AuditCtx} />
+      <Outlet
+        context={
+          { audit: a, obligations: obligations.data ?? [] } satisfies AuditCtx
+        }
+      />
     </>
   );
 }
 
 /** /auditorias/:id abre la pantalla que corresponde al estado de la auditoría. */
 function AuditIndex() {
-  const audit = useAuditCtx();
-  return <Navigate to={STATUS[audit.status].ruta} replace />;
+  const { audit } = useAuditCtx();
+  return <Navigate to={AUDIT_STATUS[audit.status].route} replace />;
 }
 
 const router = createHashRouter([
@@ -97,7 +116,7 @@ const router = createHashRouter([
           { index: true, element: <AuditIndex /> },
           { path: "preparar", element: <Preparar /> },
           { path: "terreno", element: <Terreno /> },
-          { path: "terreno/:reqId", element: <RequisitoView /> },
+          { path: "terreno/:itemId", element: <RequisitoView /> },
           { path: "panel", element: <Panel /> },
         ],
       },
@@ -107,5 +126,9 @@ const router = createHashRouter([
 ]);
 
 export function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }

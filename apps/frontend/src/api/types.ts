@@ -1,87 +1,104 @@
-import type { Auditoria, EstadoTerreno } from "@hackaton/contracts";
-
-/** Revierte un cambio hecho en terreno (botón "Deshacer"). */
-export type Undo = () => Promise<void>;
-
-export interface NuevaAuditoria {
-  inst: string;
-  nombre: string;
-  tipo: string;
-  fecha: string;
-}
-
-export interface NuevoRequisito {
-  tema: string;
-  titulo: string;
-  detalle: string;
-  /** Id del documento fuente o "MANUAL". */
-  doc: string;
-  ref: string;
-  frecuencia: string;
-  venc: string;
-  evidencia: string;
-}
-
-export interface Evaluacion {
-  estado: EstadoTerreno;
-  obs?: string;
-  naMotivo?: string;
-}
+import type {
+  AddManualRequirementRequest,
+  AssessItemRequest,
+  AuditDetail,
+  AuditItem,
+  AuditSummary,
+  Authority,
+  CategoryNotApplicableRequest,
+  CreateAuditRequest,
+  DocumentDetail,
+  DocumentKind,
+  Evidence,
+  Facility,
+  FacilityContext,
+  FacilityListItem,
+  ImportDocumentRequest,
+  ObligationListItem,
+  ObligationVersion,
+  UpdateDraftRequest,
+} from "@hackaton/contracts";
 
 /**
- * Operaciones que el frontend pide al backend, agrupadas como los endpoints
- * de la API. Las pantallas solo usan esto (vía `api`), nunca el store.
+ * Los endpoints del backend (`apps/backend`, bajo `/api`), uno por método.
+ * Las pantallas nunca llaman a esto directo: usan los hooks y acciones de
+ * `src/api/index.ts`, que además refrescan la caché.
  *
- * Hoy la implementa `localApi` sobre los datos guardados en el teléfono. Cuando
- * el backend esté listo se agrega `httpApi` con los mismos métodos y las
- * pantallas no cambian. Los nombres de campos siguen el modelo actual del
- * front; se ajustarán al modelo del MVP cuando Adriel lo apruebe.
+ * Lo implementan `httpApi` (el backend real) y `demoApi` (un backend simulado
+ * en el navegador, para presentar sin conexión al servidor).
  */
 export interface AuditApi {
-  audits: {
-    create(input: NuevaAuditoria): Promise<Auditoria>;
-    /** Paso del asistente de preparación (estado de pantalla, hoy guardado en la auditoría). */
-    setStep(auditId: string, step: number): Promise<void>;
-    toggleCategory(auditId: string, tema: string): Promise<void>;
-    publish(auditId: string, validador: string): Promise<void>;
-    close(auditId: string): Promise<void>;
+  facilities: {
+    list(): Promise<FacilityListItem[]>;
+    get(facilityId: string): Promise<Facility>;
+    /** Documentos, pertinencias, alertas y auditorías del centro. */
+    context(facilityId: string): Promise<FacilityContext>;
+    authorities(): Promise<Authority[]>;
   };
   documents: {
-    upload(auditId: string, file: File): Promise<void>;
-    loadPertinencia(auditId: string, pertId: string): Promise<void>;
-    uploadPertinencia(auditId: string, file: File): Promise<void>;
+    upload(
+      facilityId: string,
+      file: File,
+      kind: DocumentKind,
+      title?: string,
+    ): Promise<DocumentDetail>;
+    import(
+      facilityId: string,
+      req: ImportDocumentRequest,
+    ): Promise<DocumentDetail>;
   };
   obligations: {
-    /** Genera los requisitos propuestos a partir de los documentos (LLM). */
-    generate(auditId: string): Promise<void>;
-    create(auditId: string, input: NuevoRequisito): Promise<string>;
-    edit(
+    list(facilityId: string): Promise<ObligationListItem[]>;
+    updateDraft(
+      versionId: string,
+      req: UpdateDraftRequest,
+    ): Promise<ObligationVersion>;
+    validate(versionId: string): Promise<ObligationVersion>;
+    reject(versionId: string): Promise<ObligationVersion>;
+    restore(versionId: string): Promise<ObligationVersion>;
+  };
+  audits: {
+    list(facilityId: string): Promise<AuditSummary[]>;
+    get(auditId: string): Promise<AuditDetail>;
+    create(req: CreateAuditRequest): Promise<AuditDetail>;
+    /** Pasa la auditoría a validación (la extracción ocurre al subir documentos). */
+    generate(auditId: string): Promise<AuditDetail>;
+    /** Crea un ítem por cada requisito validado de las temáticas incluidas. */
+    publish(
       auditId: string,
-      reqId: string,
-      titulo: string,
-      detalle: string,
-    ): Promise<void>;
-    discard(auditId: string, reqId: string): Promise<void>;
-    restore(auditId: string, reqId: string): Promise<void>;
+      excludedCategories: string[],
+    ): Promise<AuditDetail>;
+    addManualRequirement(
+      auditId: string,
+      req: AddManualRequirementRequest,
+    ): Promise<AuditItem>;
+    markCategoryNotApplicable(
+      auditId: string,
+      category: string,
+      req: CategoryNotApplicableRequest,
+    ): Promise<AuditItem[]>;
+    close(auditId: string): Promise<AuditDetail>;
   };
   items: {
-    /** Resultado en terreno; devuelve cómo deshacerlo. */
-    assess(auditId: string, reqId: string, ev: Evaluacion): Promise<Undo>;
-    /** Marca como No aplica todos los pendientes de una temática. */
-    categoryNotApplicable(
-      auditId: string,
-      tema: string,
-    ): Promise<{ count: number; undo: Undo }>;
-    setNotes(auditId: string, reqId: string, obs: string): Promise<void>;
-    setNaReason(auditId: string, reqId: string, motivo: string): Promise<void>;
+    assess(itemId: string, req: AssessItemRequest): Promise<AuditItem>;
   };
   evidence: {
-    upload(auditId: string, reqId: string, file: File): Promise<void>;
-    remove(auditId: string, reqId: string, index: number): Promise<void>;
+    upload(
+      itemId: string,
+      file: File,
+      clientId: string,
+      capturedAt?: string,
+    ): Promise<Evidence>;
+    remove(evidenceId: string): Promise<void>;
   };
-  /** Solo para presentar el prototipo. */
-  demo: {
-    load(): Promise<void>;
-    reset(): Promise<void>;
-  };
+}
+
+/** Error de la API con el mensaje que devolvió el backend (en español). */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
 }

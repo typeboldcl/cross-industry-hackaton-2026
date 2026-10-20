@@ -1,25 +1,16 @@
-import type { Auditoria, Instalacion } from "@hackaton/contracts";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { api, attempt, useAudits } from "../api";
+import { attempt, demoControls, queryClient, useFacilities } from "../api";
 import { Icon } from "../components/Icon";
-import { Ring } from "../components/ui";
-import { INSTALACIONES } from "../data/seed";
-import { activeReqs, auditsOf, stats } from "../domain/auditoria";
+import { QueryState, Ring } from "../components/ui";
 import { pctColor, plural } from "../domain/format";
+import { FACILITY_KIND_LABEL } from "../domain/labels";
+import { useSession } from "../store/useSession";
 import { askConfirm, toast } from "../store/useUiStore";
 
-/** Resumen de un centro: última auditoría con requisitos (o datos ficticios si no hay). */
-function resumen(i: Instalacion, audits: Auditoria[]) {
-  const list = auditsOf(audits, i.id);
-  const conReqs = list.find((a) => activeReqs(a).length);
-  if (conReqs) return { pct: stats(activeReqs(conReqs)).pct, n: list.length };
-  if (i.demo) return { pct: i.demo.pct, n: list.length, ficticio: true };
-  return { pct: null, n: list.length };
-}
-
 export function Inicio() {
-  const audits = useAudits();
-  const navigate = useNavigate();
+  const facilities = useFacilities();
+  const demo = useSession((s) => s.apiMode === "demo");
 
   return (
     <div className="stack">
@@ -27,31 +18,34 @@ export function Inicio() {
         <h2>¿Qué centro vas a auditar?</h2>
         <p>Elige la instalación para ver sus auditorías o crear una nueva.</p>
       </div>
-      {INSTALACIONES.map((i) => {
-        const s = resumen(i, audits);
-        const enCurso = auditsOf(audits, i.id).filter(
-          (a) => a.status !== "cerrada",
-        ).length;
+      <ActorCard />
+      <QueryState
+        isLoading={facilities.isLoading}
+        error={facilities.error}
+        retry={facilities.refetch}
+      />
+      {facilities.data?.map((f) => {
+        const pct =
+          f.summary.score == null ? null : Math.round(f.summary.score * 100);
         return (
           <Link
-            key={i.id}
+            key={f.id}
             className="select-card"
-            to={`/centros/${i.id}`}
+            to={`/centros/${f.id}`}
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            <Ring pct={s.pct} color={pctColor(s.pct)} />
+            <Ring pct={pct} color={pctColor(pct)} />
             <span className="grow">
-              <b>{i.nombre}</b>
+              <b>{f.name}</b>
               <br />
               <span className="small muted">
-                {i.tipo} · {i.lugar}
+                {FACILITY_KIND_LABEL[f.kind]} · {f.location ?? f.comuna}
               </span>
               <br />
               <span className="xs">
-                {s.n
-                  ? `${plural(s.n, "auditoría")}${enCurso ? ` · ${enCurso} en curso` : ""}`
+                {f.summary.audits
+                  ? `${plural(f.summary.audits, "auditoría")}${f.summary.openAudits ? ` · ${f.summary.openAudits} en curso` : ""}`
                   : "Sin auditorías"}
-                {s.ficticio ? " · datos ficticios" : ""}
               </span>
             </span>
             <span className="chev">
@@ -60,7 +54,69 @@ export function Inicio() {
           </Link>
         );
       })}
-      {!audits.length && (
+      {demo && <DemoCard />}
+      <ModeSwitch />
+    </div>
+  );
+}
+
+/** El backend registra quién hace cada cambio (X-Actor-Name); se pide una vez. */
+function ActorCard() {
+  const actorName = useSession((s) => s.actorName);
+  const setActorName = useSession((s) => s.setActorName);
+  const [draft, setDraft] = useState(actorName);
+  const [editing, setEditing] = useState(!actorName);
+
+  if (!editing) {
+    return (
+      <div className="card row">
+        <span className="grow small">
+          Auditando como <b>{actorName}</b>
+        </span>
+        <button className="btn ghost sm" onClick={() => setEditing(true)}>
+          Cambiar
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="card stack">
+      <label className="small" htmlFor="actor">
+        <b>¿Quién está auditando?</b>
+        <br />
+        <span className="muted">
+          Tu nombre y cargo quedan registrados en cada validación y resultado.
+        </span>
+      </label>
+      <div className="row">
+        <input
+          id="actor"
+          type="text"
+          placeholder="Nombre y cargo"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <button
+          className="btn primary"
+          disabled={!draft.trim()}
+          onClick={() => {
+            setActorName(draft.trim());
+            setEditing(false);
+          }}
+        >
+          Guardar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DemoCard() {
+  const navigate = useNavigate();
+  const refresh = () => queryClient.invalidateQueries();
+  return (
+    <>
+      {!demoControls.hasAudits() && (
         <div className="card row wrap">
           <div className="grow small">
             <b>¿Presentando?</b>
@@ -73,35 +129,70 @@ export function Inicio() {
           <button
             className="btn sm"
             onClick={() =>
-              void attempt(api.demo.load()).then((ok) => {
-                if (!ok) return;
-                toast("Ejemplo cargado: 2 auditorías en Piscicultura Aucha");
-                void navigate("/centros/aucha");
-              })
+              void attempt(demoControls.loadExample().then(refresh)).then(
+                (ok) => {
+                  if (!ok) return;
+                  toast("Ejemplo cargado: 2 auditorías en Piscicultura Aucha");
+                  void navigate("/");
+                },
+              )
             }
           >
             Cargar ejemplo
           </button>
         </div>
       )}
-      <div className="row" style={{ justifyContent: "center", marginTop: 8 }}>
+      <div className="row" style={{ justifyContent: "center" }}>
         <button
           className="btn ghost small"
           onClick={() =>
             askConfirm({
-              titulo: "¿Reiniciar el prototipo?",
+              titulo: "¿Reiniciar el modo demo?",
               texto:
-                "Se borrarán todas las auditorías, requisitos y evidencias guardados en este dispositivo.",
+                "Se borrarán las auditorías, requisitos y evidencias de ejemplo guardados en este dispositivo.",
               ok: "Borrar todo",
               peligro: true,
               onOk: () =>
-                void attempt(api.demo.reset()).then(
-                  (ok) => ok && toast("Prototipo reiniciado"),
+                void attempt(demoControls.reset().then(refresh)).then(
+                  (ok) => ok && toast("Modo demo reiniciado"),
                 ),
             })
           }
         >
-          Reiniciar prototipo
+          Reiniciar modo demo
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** Demo (datos en el navegador) o backend real. */
+function ModeSwitch() {
+  const apiMode = useSession((s) => s.apiMode);
+  const setApiMode = useSession((s) => s.setApiMode);
+  return (
+    <div className="card row wrap small">
+      <span className="grow">
+        <b>Origen de los datos</b>
+        <br />
+        <span className="muted">
+          {apiMode === "demo"
+            ? "Modo demo: datos de ejemplo guardados en este navegador."
+            : `Backend: ${import.meta.env.VITE_API_URL ?? "/api"}`}
+        </span>
+      </span>
+      <div className="tabs">
+        <button
+          className={apiMode === "demo" ? "on" : ""}
+          onClick={() => setApiMode("demo")}
+        >
+          Demo
+        </button>
+        <button
+          className={apiMode === "http" ? "on" : ""}
+          onClick={() => setApiMode("http")}
+        >
+          Backend
         </button>
       </div>
     </div>

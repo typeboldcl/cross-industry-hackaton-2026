@@ -26,9 +26,18 @@ interface UiState {
   q: string;
   /** Formulario "agregar requisito" abierto en Preparar. */
   adding: boolean;
+  /** Paso del asistente de preparación, por auditoría. */
+  steps: Record<string, number>;
+  /**
+   * Temáticas que el responsable dejó fuera, por auditoría. El backend las
+   * recibe recién al publicar.
+   */
+  excluded: Record<string, string[]>;
   setTab: (tab: Tab) => void;
   setQ: (q: string) => void;
   setAdding: (adding: boolean) => void;
+  setStep: (auditId: string, step: number) => void;
+  toggleExcluded: (auditId: string, category: string) => void;
   showToast: (msg: string, undo?: () => void) => void;
   hideToast: (id: number) => void;
   askConfirm: (req: ConfirmReq) => void;
@@ -44,9 +53,25 @@ export const useUiStore = create<UiState>()((set) => ({
   tab: "todos",
   q: "",
   adding: false,
+  steps: {},
+  excluded: {},
   setTab: (tab) => set({ tab }),
   setQ: (q) => set({ q }),
   setAdding: (adding) => set({ adding }),
+  setStep: (auditId, step) =>
+    set((s) => ({ steps: { ...s.steps, [auditId]: step } })),
+  toggleExcluded: (auditId, category) =>
+    set((s) => {
+      const cur = s.excluded[auditId] ?? [];
+      return {
+        excluded: {
+          ...s.excluded,
+          [auditId]: cur.includes(category)
+            ? cur.filter((c) => c !== category)
+            : [...cur, category],
+        },
+      };
+    }),
   showToast: (msg, undo) => set({ toast: { id: ++seq, msg, undo } }),
   hideToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : s)),
   askConfirm: (confirm) => set({ confirm }),

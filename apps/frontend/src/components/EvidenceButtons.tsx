@@ -1,15 +1,15 @@
 import { useRef } from "react";
-import { api, run } from "../api";
+import { actions, run } from "../api";
 import { Icon } from "./Icon";
 
-/** "Tomar foto" (abre la cámara en el celular) y "Adjuntar" para un requisito. */
+/** "Tomar foto" (abre la cámara en el celular) y "Adjuntar" para un ítem. */
 export function EvidenceButtons({
-  aid,
-  rid,
+  auditId,
+  itemId,
   small,
 }: {
-  aid: string;
-  rid: string;
+  auditId: string;
+  itemId: string;
   small?: boolean;
 }) {
   const photo = useRef<HTMLInputElement>(null);
@@ -17,7 +17,7 @@ export function EvidenceButtons({
   const onFile = async (input: HTMLInputElement) => {
     const f = input.files?.[0];
     input.value = "";
-    if (f) await run(api.evidence.upload(aid, rid, f));
+    if (f) await run(actions.uploadEvidence(auditId, itemId, f));
   };
   const size = small ? 16 : 18;
   const cls = small ? "btn sm" : "btn grow";

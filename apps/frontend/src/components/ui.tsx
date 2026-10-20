@@ -1,22 +1,23 @@
-import type { Auditoria, EstadoTerreno } from "@hackaton/contracts";
+import type {
+  AuditResult,
+  AuditSummary,
+  FacilityAlert,
+} from "@hackaton/contracts";
 import { Link } from "react-router";
-import type { Alerta } from "../data/seed";
-import { INSTALACIONES } from "../data/seed";
-import type { Stats } from "../domain/auditoria";
+import { useFacilityContext } from "../api";
+import type { Stats } from "../domain/audit";
 import { daysTo, pctLabel } from "../domain/format";
+import { RESULT_CSS } from "../domain/labels";
 import { Icon } from "./Icon";
 
-export const instById = (id: string | undefined) =>
-  INSTALACIONES.find((i) => i.id === id);
-
 export function ProgressBar({ st }: { st: Stats }) {
-  const w = (k: "cumple" | "no_cumple" | "na") =>
+  const w = (k: "compliant" | "non_compliant" | "not_applicable") =>
     st.total ? `${(st[k] / st.total) * 100}%` : "0%";
   return (
     <div className="progress" role="img" aria-label="Avance">
-      <i style={{ width: w("cumple"), background: "var(--ok)" }} />
-      <i style={{ width: w("no_cumple"), background: "var(--bad)" }} />
-      <i style={{ width: w("na"), background: "var(--na)" }} />
+      <i style={{ width: w("compliant"), background: "var(--ok)" }} />
+      <i style={{ width: w("non_compliant"), background: "var(--bad)" }} />
+      <i style={{ width: w("not_applicable"), background: "var(--na)" }} />
     </div>
   );
 }
@@ -58,28 +59,28 @@ export function Ring({ pct, color }: { pct: number | null; color: string }) {
   );
 }
 
-export function DueTag({ venc }: { venc?: string }) {
-  if (!venc) return null;
-  const d = daysTo(venc);
+export function DueTag({ due }: { due?: string | null }) {
+  if (!due) return null;
+  const d = daysTo(due);
   const cls = d < 0 ? "bad" : d <= 14 ? "warn" : "info";
   const txt =
     d < 0 ? `Vencido hace ${-d} d` : d === 0 ? "Vence hoy" : `Vence en ${d} d`;
   return <span className={`tag ${cls}`}>{txt}</span>;
 }
 
-export function AlertBox({ a }: { a: Alerta }) {
+export function AlertBox({ a }: { a: FacilityAlert }) {
   return (
-    <div className={`alert ${a.tipo}`} style={{ marginBottom: 8 }}>
+    <div className={`alert ${a.kind}`} style={{ marginBottom: 8 }}>
       <div>
-        <b>{a.titulo}</b>
-        {a.texto}
+        <b>{a.title}</b>
+        {a.text}
       </div>
     </div>
   );
 }
 
-export function Dot({ estado }: { estado: EstadoTerreno }) {
-  return <span className={`dot ${estado}`} />;
+export function Dot({ result }: { result: AuditResult }) {
+  return <span className={`dot ${RESULT_CSS[result]}`} />;
 }
 
 export function NumBadge({ code }: { code?: string }) {
@@ -87,10 +88,12 @@ export function NumBadge({ code }: { code?: string }) {
 }
 
 /** Miga de pan hacia las auditorías del centro. */
-export function Crumb({ a }: { a: Auditoria }) {
+export function Crumb({ a }: { a: Pick<AuditSummary, "facilityId"> }) {
+  const ctx = useFacilityContext(a.facilityId);
   return (
-    <Link to={`/centros/${a.inst}`} className="crumb">
-      <Icon name="back" size={16} /> {instById(a.inst)?.nombre} · auditorías
+    <Link to={`/centros/${a.facilityId}`} className="crumb">
+      <Icon name="back" size={16} /> {ctx.data?.facility.name ?? "Centro"} ·
+      auditorías
     </Link>
   );
 }
@@ -100,15 +103,15 @@ export function Legend({ st }: { st?: Stats }) {
     <div className="legend" style={{ marginTop: 8 }}>
       <span>
         <i style={{ background: "var(--ok)" }} />
-        Cumple{st ? ` ${st.cumple}` : ""}
+        Cumple{st ? ` ${st.compliant}` : ""}
       </span>
       <span>
         <i style={{ background: "var(--bad)" }} />
-        No cumple{st ? ` ${st.no_cumple}` : ""}
+        No cumple{st ? ` ${st.non_compliant}` : ""}
       </span>
       <span>
         <i style={{ background: "var(--na)" }} />
-        N/A{st ? ` ${st.na}` : ""}
+        N/A{st ? ` ${st.not_applicable}` : ""}
       </span>
       {!st && (
         <span>
@@ -138,6 +141,31 @@ export function Empty({
       <Link className="btn primary" to={to}>
         {accion}
       </Link>
+    </div>
+  );
+}
+
+/** Estado de una consulta a la API: cargando o con error (con reintentar). */
+export function QueryState({
+  isLoading,
+  error,
+  retry,
+}: {
+  isLoading: boolean;
+  error: unknown;
+  retry: () => unknown;
+}) {
+  if (isLoading) return <div className="empty">Cargando…</div>;
+  if (!error) return null;
+  return (
+    <div className="empty card">
+      <h3>No se pudieron cargar los datos</h3>
+      <p className="small">
+        {error instanceof Error ? error.message : "Error desconocido."}
+      </p>
+      <button className="btn" onClick={() => void retry()}>
+        Reintentar
+      </button>
     </div>
   );
 }

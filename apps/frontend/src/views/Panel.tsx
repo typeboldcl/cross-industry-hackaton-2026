@@ -1,19 +1,23 @@
 import { Link } from "react-router";
+import { actions, attempt, useFacilityContext } from "../api";
 import {
   AlertBox,
   Crumb,
   Dot,
   DueTag,
-  instById,
   Legend,
   ProgressBar,
 } from "../components/ui";
-import { ALERTAS } from "../data/seed";
-import { activeReqs, auditsOf, stats, temasDe } from "../domain/auditoria";
-import { STATUS } from "../domain/constants";
+import {
+  auditStats,
+  categoriesOf,
+  categoryLookup,
+  numberItems,
+  statsFromItems,
+} from "../domain/audit";
 import { fmtDate, pctColor, pctLabel } from "../domain/format";
+import { AUDIT_STATUS } from "../domain/labels";
 import { useAuditCtx } from "../hooks/useAuditCtx";
-import { api, attempt, useAudits } from "../api";
 import { askConfirm, toast } from "../store/useUiStore";
 
 const fila = {
@@ -24,21 +28,22 @@ const fila = {
 } as const;
 
 export function Panel() {
-  const a = useAuditCtx();
-  const audits = useAudits();
-  const list = activeReqs(a);
-  const st = stats(list);
-  const inst = instById(a.inst);
-  const temas = temasDe(list).map((t) => ({
+  const { audit: a, obligations } = useAuditCtx();
+  const ctx = useFacilityContext(a.facilityId).data;
+  const { rows } = numberItems(a.items, categoryLookup(obligations));
+  const st = statsFromItems(a.items);
+  const temas = categoriesOf(rows).map((t) => ({
     t,
-    s: stats(list.filter((r) => r.tema === t)),
+    s: statsFromItems(rows.filter((r) => r.category === t).map((r) => r.item)),
   }));
-  const venc = list
-    .filter((r) => r.venc && r.estado !== "cumple")
-    .sort((x, y) => (x.venc ?? "").localeCompare(y.venc ?? ""))
+  const venc = a.items
+    .filter((i) => i.version.dueDate && i.result !== "compliant")
+    .sort((x, y) =>
+      (x.version.dueDate ?? "").localeCompare(y.version.dueDate ?? ""),
+    )
     .slice(0, 6);
-  const hall = list.filter((r) => r.estado === "no_cumple");
-  const evidencias = list.reduce((n, r) => n + r.evidencias.length, 0);
+  const hall = a.items.filter((i) => i.result === "non_compliant");
+  const evidencias = a.items.reduce((n, i) => n + i.evidence.length, 0);
 
   return (
     <div className="stack">
@@ -47,11 +52,11 @@ export function Panel() {
         <div className="grow">
           <h2>Panel de cumplimiento</h2>
           <div className="small muted">
-            {inst?.nombre} · {a.nombre}
+            {ctx?.facility.name} · {a.title}
           </div>
         </div>
-        <span className={`tag ${STATUS[a.status].cls}`}>
-          {STATUS[a.status].label}
+        <span className={`tag ${AUDIT_STATUS[a.status].cls}`}>
+          {AUDIT_STATUS[a.status].label}
         </span>
       </div>
       <div className="kpis">
@@ -62,12 +67,12 @@ export function Panel() {
           <div className="l">Cumplimiento</div>
         </div>
         <div className="kpi">
-          <div className="v">{st.avance}%</div>
+          <div className="v">{st.progress}%</div>
           <div className="l">Avance de auditoría</div>
         </div>
         <div className="kpi">
           <div className="v" style={{ color: "var(--bad)" }}>
-            {st.no_cumple}
+            {st.non_compliant}
           </div>
           <div className="l">No cumple</div>
         </div>
@@ -76,7 +81,7 @@ export function Panel() {
           <div className="l">Evidencias cargadas</div>
         </div>
       </div>
-      {a.status === "publicada" && (
+      {a.status === "published" && (
         <div className="card row wrap">
           <div className="grow small">
             <b>¿Terminó el trabajo en terreno?</b>
@@ -84,7 +89,7 @@ export function Panel() {
             <span className="muted">
               Al cerrar, la auditoría queda en solo lectura dentro del historial
               del centro.
-              {st.pendiente ? ` Quedan ${st.pendiente} pendientes.` : ""}
+              {st.pending ? ` Quedan ${st.pending} pendientes.` : ""}
             </span>
           </div>
           <button
@@ -96,7 +101,7 @@ export function Panel() {
                   "Quedará en solo lectura dentro del historial del centro. Podrás revisar sus resultados y evidencias, pero no modificarlos.",
                 ok: "Cerrar auditoría",
                 onOk: () =>
-                  void attempt(api.audits.close(a.id)).then(
+                  void attempt(actions.close(a.id, a.facilityId)).then(
                     (ok) => ok && toast("Auditoría cerrada"),
                   ),
               })
@@ -106,41 +111,47 @@ export function Panel() {
           </button>
         </div>
       )}
-      <div className="sec-title">Historial de auditorías · {inst?.nombre}</div>
-      <div className="card">
-        {auditsOf(audits, a.inst).map((h) => {
-          const s = stats(activeReqs(h));
-          return (
-            <Link
-              key={h.id}
-              className="row"
-              to={`/auditorias/${h.id}/panel`}
-              style={fila}
-            >
-              <span className="grow small">
-                <b>{h.nombre}</b>
-                {h.id === a.id && (
-                  <>
-                    {" "}
-                    <span className="tag info">abierta</span>
-                  </>
-                )}
-                <br />
-                <span className="muted">
-                  {fmtDate(h.fecha)} · {STATUS[h.status].label}
-                </span>
-              </span>
-              <span
-                className="small"
-                style={{ fontWeight: 700, color: pctColor(s.pct) }}
-              >
-                {pctLabel(s.pct)}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-      {list.length ? (
+      {ctx && (
+        <>
+          <div className="sec-title">
+            Historial de auditorías · {ctx.facility.name}
+          </div>
+          <div className="card">
+            {ctx.audits.map((h) => {
+              const s = auditStats(h);
+              return (
+                <Link
+                  key={h.id}
+                  className="row"
+                  to={`/auditorias/${h.id}/panel`}
+                  style={fila}
+                >
+                  <span className="grow small">
+                    <b>{h.title}</b>
+                    {h.id === a.id && (
+                      <>
+                        {" "}
+                        <span className="tag info">abierta</span>
+                      </>
+                    )}
+                    <br />
+                    <span className="muted">
+                      {fmtDate(h.plannedOn)} · {AUDIT_STATUS[h.status].label}
+                    </span>
+                  </span>
+                  <span
+                    className="small"
+                    style={{ fontWeight: 700, color: pctColor(s.pct) }}
+                  >
+                    {pctLabel(s.pct)}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {a.items.length ? (
         <>
           <div className="sec-title">Cumplimiento por temática</div>
           <div className="card">
@@ -158,22 +169,20 @@ export function Panel() {
           <div className="sec-title">Próximos vencimientos</div>
           <div className="card">
             {venc.length ? (
-              venc.map((r) => (
+              venc.map((i) => (
                 <Link
-                  key={r.id}
+                  key={i.id}
                   className="row"
-                  to={`../terreno/${r.id}`}
+                  to={`../terreno/${i.id}`}
                   style={fila}
                 >
-                  <Dot estado={r.estado} />
+                  <Dot result={i.result} />
                   <span className="grow small">
-                    <b>{r.titulo}</b>
+                    <b>{i.version.title}</b>
                     <br />
-                    <span className="muted">
-                      {fmtDate(r.venc)} · {r.tema}
-                    </span>
+                    <span className="muted">{fmtDate(i.version.dueDate)}</span>
                   </span>
-                  <DueTag venc={r.venc} />
+                  <DueTag due={i.version.dueDate} />
                 </Link>
               ))
             ) : (
@@ -183,18 +192,20 @@ export function Panel() {
           <div className="sec-title">Hallazgos (no cumple)</div>
           <div className="card">
             {hall.length ? (
-              hall.map((r) => (
+              hall.map((i) => (
                 <Link
-                  key={r.id}
+                  key={i.id}
                   className="row"
-                  to={`../terreno/${r.id}`}
+                  to={`../terreno/${i.id}`}
                   style={fila}
                 >
-                  <Dot estado={r.estado} />
+                  <Dot result={i.result} />
                   <span className="grow small">
-                    <b>{r.titulo}</b>
+                    <b>{i.version.title}</b>
                     <br />
-                    <span className="muted">{r.obs || "Sin observación"}</span>
+                    <span className="muted">
+                      {i.notes || "Sin observación"}
+                    </span>
                   </span>
                 </Link>
               ))
@@ -205,14 +216,14 @@ export function Panel() {
         </>
       ) : (
         <div className="empty card">
-          Esta auditoría todavía no tiene requisitos validados.
+          Esta auditoría todavía no tiene requisitos publicados.
         </div>
       )}
-      {a.inst === "aucha" && (
+      {ctx && ctx.alerts.length > 0 && (
         <>
           <div className="sec-title">Alertas de documentos</div>
-          {ALERTAS.map((x) => (
-            <AlertBox key={x.titulo} a={x} />
+          {ctx.alerts.map((x) => (
+            <AlertBox key={x.id} a={x} />
           ))}
         </>
       )}

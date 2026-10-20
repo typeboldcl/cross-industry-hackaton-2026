@@ -1,20 +1,23 @@
 import { useEffect, useRef } from "react";
 import { Link, useMatches } from "react-router";
+import { useAudit, useFacilityContext } from "../api";
 import { useConnectivity } from "../hooks/useConnectivity";
 import { useTheme } from "../hooks/useTheme";
-import { useAudit } from "../api";
+import { useSession } from "../store/useSession";
 import { Icon } from "./Icon";
-import { instById } from "./ui";
 
 export function TopBar() {
   const ref = useRef<HTMLElement>(null);
   const { theme, toggle } = useTheme();
-  const { online, pending } = useConnectivity();
+  const online = useConnectivity();
+  const demo = useSession((s) => s.apiMode === "demo");
   const params = (useMatches().at(-1)?.params ?? {}) as Record<
     string,
     string | undefined
   >;
-  const audit = useAudit(params.auditId);
+  const audit = useAudit(params.auditId).data;
+  const facilityId = audit?.facilityId ?? params.centroId;
+  const facility = useFacilityContext(facilityId).data?.facility;
 
   // Los filtros de Terreno y la barra lateral se pegan justo bajo esta barra.
   useEffect(() => {
@@ -31,9 +34,11 @@ export function TopBar() {
     return () => ro.disconnect();
   }, []);
 
-  const sub = audit
-    ? `${instById(audit.inst)?.nombre} · ${audit.nombre}`
-    : (instById(params.centroId)?.nombre ?? "Selecciona un centro");
+  const sub = facility
+    ? audit
+      ? `${facility.name} · ${audit.title}`
+      : facility.name
+    : "Selecciona un centro";
 
   return (
     <header className="topbar" ref={ref}>
@@ -46,12 +51,13 @@ export function TopBar() {
         <span className="ttl-s">Auditorías</span>
         <small>{sub}</small>
       </h1>
-      <span className={`net ${online ? "" : "off"}`}>
-        {online
-          ? pending
-            ? `Sincronizando ${pending}…`
-            : "En línea"
-          : `Sin conexión${pending ? ` · ${pending} por sincronizar` : ""}`}
+      <span
+        className={`net ${online ? "" : "off"}`}
+        title={
+          demo ? "Datos de ejemplo guardados en este navegador" : undefined
+        }
+      >
+        {!online ? "Sin conexión" : demo ? "Modo demo" : "En línea"}
       </span>
       <button
         className="theme-btn"

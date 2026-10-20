@@ -1,15 +1,49 @@
 /*
  * Datos de ejemplo extraídos manualmente de los documentos del reto
  * (RCA 202410001185, Rectificación RCA, Res. Sanitaria SUSPEL y Res. Sanitaria
- * RESPEL). REQ_TEMPLATES tiene la forma que debe devolver la extracción con
- * LLM (RequisitoExtraido en @hackaton/contracts).
+ * RESPEL). Solo los usa el modo demo (`src/api/demo`), que los convierte a los
+ * contratos del backend; el backend real los obtiene de la extracción con LLM.
  */
-import type {
-  Documento,
-  Instalacion,
-  Pertinencia,
-  RequisitoExtraido,
-} from "@hackaton/contracts";
+
+export interface Instalacion {
+  id: string;
+  nombre: string;
+  tipo: string;
+  lugar: string;
+  real: boolean;
+  demo?: { pct: number; avance: number; nc: number; total: number };
+}
+
+export interface Documento {
+  id: string;
+  tipo: string;
+  numero: string;
+  fecha?: string;
+  emisor?: string;
+  titulo: string;
+  vigencia?: string;
+  estado?: "ok" | "warn" | "info";
+}
+
+export interface Pertinencia {
+  id: string;
+  numero: string;
+  titulo: string;
+  cargada: boolean;
+}
+
+/** Un requisito tal como lo extrajimos a mano de los documentos de Aucha. */
+export interface RequisitoExtraido {
+  id: string;
+  tema: string;
+  titulo: string;
+  detalle: string;
+  fuente: { doc: string; ref: string };
+  frecuencia: string;
+  evidencia: string;
+  venc?: string;
+  rectificado?: string;
+}
 
 export interface Alerta {
   tipo: "warn" | "info" | "bad";

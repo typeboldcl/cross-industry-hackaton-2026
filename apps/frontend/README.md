@@ -15,7 +15,11 @@ pnpm dev:frontend
 
 Then open http://localhost:5173. Other scripts, run from `apps/frontend` or with `pnpm --filter hackaton-frontend <script>`: `build`, `preview`, `typecheck`, `lint` and `test`.
 
-Progress is stored in the browser's `localStorage` (key `auditorias-react-v1`), so the app works offline. Use "Reiniciar prototipo" on the Centros screen to reset it, or "Cargar ejemplo" to load Piscicultura Aucha with two audits (Q3 closed, Q4 in progress on site).
+### Backend or demo mode
+
+The app talks to the NestJS backend through the contracts in `@hackaton/contracts` (`src/api/httpApi.ts`). Set `VITE_API_URL` (e.g. `VITE_API_URL=http://localhost:3000/api` in `apps/frontend/.env.local`) to point at it; requests send the user's name in `X-Actor-Name`.
+
+Without a backend, it runs in **demo mode**: `src/api/demo/` is an in-browser backend that returns the same contracts and applies the same rules (validations, statuses), storing data in `localStorage`. "Cargar ejemplo" loads Piscicultura Aucha with two audits (Q3 closed, Q4 on site). The Centros screen switches between Demo and Backend.
 
 ## Structure
 

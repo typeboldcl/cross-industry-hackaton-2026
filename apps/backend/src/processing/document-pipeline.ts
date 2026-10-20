@@ -8,7 +8,8 @@ import {
   filterSections,
   prioritizeSections,
 } from "../documents/section-filter.js";
-import { sectionDocument } from "../documents/sectioner.js";
+import { type Section, sectionDocument } from "../documents/sectioner.js";
+import { ChunkEmbeddingService } from "../embeddings/chunk-embedding.service.js";
 import { ExtractionService } from "../extraction/extraction.service.js";
 import { STORAGE, type StorageService } from "../storage/storage.service.js";
 
@@ -20,17 +21,20 @@ export class DocumentPipeline {
     @InjectDataSource() private readonly db: DataSource,
     @Inject(STORAGE) private readonly storage: StorageService,
     private readonly extraction: ExtractionService,
+    private readonly chunks: ChunkEmbeddingService,
   ) {}
 
   async run(documentId: string): Promise<void> {
     const document = await this.claim(documentId);
     if (!document) return;
 
+    let allSections: Section[] = [];
     try {
       const pages = await this.pagesOf(document);
       const number = document.number ?? numberFromText(pages);
+      allSections = sectionDocument(pages);
       const sections = prioritizeSections(
-        filterSections(document.kind, sectionDocument(pages)),
+        filterSections(document.kind, allSections),
       );
 
       await this.db.query(
@@ -76,6 +80,8 @@ export class DocumentPipeline {
         [document.id, message.slice(0, 2_000)],
       );
     }
+
+    await this.chunks.embedSections(document, allSections);
   }
 
   private async claim(documentId: string): Promise<DocumentEntity | null> {

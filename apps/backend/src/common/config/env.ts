@@ -33,6 +33,12 @@ export interface LlmSettings {
   timeoutMs: number;
 }
 
+export interface EmbeddingSettings {
+  enabled: boolean;
+  baseUrl: string;
+  model: string;
+}
+
 export interface Env {
   environment: RuntimeEnvironment;
   isLocal: boolean;
@@ -42,7 +48,7 @@ export interface Env {
   database: DatabaseConnection;
   storage: StorageSettings;
   llm: LlmSettings;
-  ollamaBaseUrl: string;
+  embeddings: EmbeddingSettings;
   seiaBaseUrl: string;
 }
 
@@ -95,7 +101,11 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
       concurrency: readInteger(source, "LLM_CONCURRENCY", 2),
       timeoutMs: readInteger(source, "LLM_TIMEOUT_MS", 300_000),
     },
-    ollamaBaseUrl: read(source, "OLLAMA_BASE_URL") ?? "http://localhost:11434",
+    embeddings: {
+      enabled: readBoolean(source, "EMBEDDINGS_ENABLED", true),
+      baseUrl: read(source, "OLLAMA_BASE_URL") ?? "http://localhost:11434",
+      model: read(source, "EMBEDDING_MODEL") ?? "qwen3-embedding:0.6b",
+    },
     seiaBaseUrl: read(source, "SEIA_BASE_URL") ?? "https://seia.sea.gob.cl",
   };
 }
@@ -146,6 +156,24 @@ function readInteger(
   }
 
   return parsed;
+}
+
+function readBoolean(
+  source: NodeJS.ProcessEnv,
+  name: string,
+  byDefault: boolean,
+): boolean {
+  const value = read(source, name)?.toLowerCase();
+
+  if (value === undefined) {
+    return byDefault;
+  }
+
+  if (value !== "true" && value !== "false") {
+    throw new EnvError(`${name} must be "true" or "false", got "${value}".`);
+  }
+
+  return value === "true";
 }
 
 function readList(source: NodeJS.ProcessEnv, name: string): string[] {

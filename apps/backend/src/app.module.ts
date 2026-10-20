@@ -9,9 +9,11 @@ import { EnvModule } from "./common/config/env.module.js";
 import { postgresOptions } from "./common/database/connection.js";
 import { ENTITIES } from "./common/database/entities.js";
 import { DocumentsModule } from "./documents/documents.module.js";
+import { EmbeddingModule } from "./embeddings/embedding.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { LlmModule } from "./llm/llm.module.js";
 import { ObligationsModule } from "./obligations/obligations.module.js";
+import { QueryModule } from "./query/query.module.js";
 import { SeiaModule } from "./seia/seia.module.js";
 import { StorageModule } from "./storage/storage.module.js";
 
@@ -28,6 +30,7 @@ import { StorageModule } from "./storage/storage.module.js";
     }),
     StorageModule,
     LlmModule,
+    EmbeddingModule,
     HealthModule,
     CatalogModule,
     DocumentsModule,
@@ -35,6 +38,7 @@ import { StorageModule } from "./storage/storage.module.js";
     AuditsModule,
     ComplianceModule,
     ContextModule,
+    QueryModule,
     SeiaModule,
   ],
 })

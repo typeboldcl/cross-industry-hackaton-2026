@@ -14,8 +14,8 @@ import {
   type RequisitoExtraido,
 } from "../../data/seed";
 import type { DemoAudit, DemoDb, DemoItem, DemoObligation } from "./db";
+import { uuid } from "../../domain/uuid";
 
-const uuid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 
 /** Las mismas instituciones que siembra la migración del backend. */

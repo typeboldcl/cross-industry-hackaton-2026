@@ -10,6 +10,7 @@ import type {
   UpdateDraftRequest,
 } from "@hackaton/contracts";
 import { QueryClient, useQuery } from "@tanstack/react-query";
+import { uuid } from "../domain/uuid";
 import { useSession } from "../store/useSession";
 import { toast } from "../store/useUiStore";
 import { demoApi } from "./demo/demoApi";
@@ -113,7 +114,7 @@ const previous = (i: AuditItem): AssessItemRequest => ({
 export const actions = {
   async createAudit(req: CreateAuditRequest) {
     const audit = await api().audits.create({
-      clientId: crypto.randomUUID(),
+      clientId: uuid(),
       ...req,
     });
     await refresh(keys.context(req.facilityId), keys.facilities);
@@ -169,7 +170,7 @@ export const actions = {
     req: AddManualRequirementRequest,
   ) {
     const item = await api().audits.addManualRequirement(auditId, {
-      clientId: crypto.randomUUID(),
+      clientId: uuid(),
       ...req,
     });
     await refresh(keys.obligations(facilityId));
@@ -221,12 +222,7 @@ export const actions = {
     };
   },
   async uploadEvidence(auditId: string, itemId: string, file: File) {
-    await api().evidence.upload(
-      itemId,
-      file,
-      crypto.randomUUID(),
-      new Date().toISOString(),
-    );
+    await api().evidence.upload(itemId, file, uuid(), new Date().toISOString());
     await refresh(keys.audit(auditId));
   },
   async removeEvidence(auditId: string, evidenceId: string) {

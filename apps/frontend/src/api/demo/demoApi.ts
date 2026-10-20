@@ -19,6 +19,7 @@ import {
   saveDb,
 } from "./db";
 import { emptyDb, exampleDb, extractAuchaDrafts } from "./seed";
+import { uuid } from "../../domain/uuid";
 
 /*
  * Backend simulado en el navegador. Responde con los mismos contratos y aplica
@@ -28,7 +29,6 @@ import { emptyDb, exampleDb, extractAuchaDrafts } from "./seed";
 
 let db: DemoDb = loadDb() ?? emptyDb();
 
-const uuid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 /** Un poco de latencia para que la interfaz muestre sus estados de carga. */
 const delay = () => new Promise((r) => setTimeout(r, 60));

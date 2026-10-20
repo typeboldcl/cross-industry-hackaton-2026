@@ -4,6 +4,7 @@ Documento de funcionamiento y composición del prototipo de frontend para el **R
 
 - Archivo del prototipo: `apps/frontend/prototipo/index.html` (un solo archivo HTML + CSS + JavaScript, sin dependencias) más el logo en `assets/invermar-logo.png`. La fuente Montserrat se carga desde Google Fonts; sin conexión se usa la fuente del sistema.
 - Estado: prototipo navegable con datos reales extraídos de los documentos del reto. La extracción con LLM, el backend y la sincronización real están **simulados**.
+- **Versión React:** el prototipo ya se portó a React (Vite + TypeScript) en `apps/frontend/src`, con el mismo funcionamiento descrito aquí. Las diferencias son que la auditoría abierta va en la URL (`#/auditorias/{id}/terreno`) y que los tipos del dominio están en `@hackaton/contracts`. Ver `apps/frontend/README.md`.
 
 ---
 

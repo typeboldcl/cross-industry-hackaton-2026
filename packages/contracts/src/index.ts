@@ -44,3 +44,18 @@ export type {
   QueryRequest,
   QueryResponse,
 } from "./query.js";
+export type {
+  Auditoria,
+  Documento,
+  EstadoAuditoria,
+  EstadoDocumento,
+  EstadoTerreno,
+  EventoHistorial,
+  Evidencia,
+  FuenteRequisito,
+  Instalacion,
+  Pertinencia,
+  Requisito,
+  RequisitoExtraido,
+  Validacion,
+} from "./auditoria.js";

@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Auditorías por Instalación</title>
+<meta name="theme-color" content="#0f5c6e">
+<style>
+:root{
+  --bg:#f4f6f7; --surface:#ffffff; --surface-2:#eef2f3; --border:#d9e0e3;
+  --text:#14212b; --muted:#5b6b75; --primary:#0f5c6e; --primary-ink:#ffffff; --primary-soft:#e2f0f3;
+  --ok:#1e9e5a; --ok-soft:#e3f5ea; --warn:#c98a00; --warn-soft:#fdf3d8; --bad:#d64545; --bad-soft:#fbe6e6;
+  --na:#8a98a1; --na-soft:#eceff1; --info:#2f6fd6; --info-soft:#e6eefb;
+  --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1519; --surface:#172026; --surface-2:#1e2a31; --border:#2b3a43;
+    --text:#e6edf1; --muted:#9aabb5; --primary:#3fb0c9; --primary-ink:#06222a; --primary-soft:#163640;
+    --ok:#3ccb7f; --ok-soft:#143523; --warn:#e8b23a; --warn-soft:#3a2f12; --bad:#f06b6b; --bad-soft:#3d1c1c;
+    --na:#7d8b94; --na-soft:#222d33; --info:#6fa0f0; --info-soft:#1a2a45;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1519; --surface:#172026; --surface-2:#1e2a31; --border:#2b3a43;
+  --text:#e6edf1; --muted:#9aabb5; --primary:#3fb0c9; --primary-ink:#06222a; --primary-soft:#163640;
+  --ok:#3ccb7f; --ok-soft:#143523; --warn:#e8b23a; --warn-soft:#3a2f12; --bad:#f06b6b; --bad-soft:#3d1c1c;
+  --na:#7d8b94; --na-soft:#222d33; --info:#6fa0f0; --info-soft:#1a2a45;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--primary)}
+.app{min-height:100vh;padding-bottom:84px}
+/* Header */
+.topbar{position:sticky;top:0;z-index:20;background:var(--primary);color:var(--primary-ink);padding:10px 16px;display:flex;align-items:center;gap:10px}
+.topbar h1{font-size:16px;margin:0;font-weight:650;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar small{display:block;font-weight:400;opacity:.85;font-size:12px}
+.net{font-size:12px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.18);white-space:nowrap}
+.theme-btn{width:34px;height:34px;flex:none;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:inherit;display:grid;place-items:center;padding:0}
+.theme-btn:hover{background:rgba(255,255,255,.3)}
+.theme-btn svg{width:18px;height:18px}
+.net.off{background:var(--warn);color:#1b1400}
+.main{max-width:760px;margin:0 auto;padding:16px}
+/* Nav */
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--surface);border-top:1px solid var(--border);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none;color:var(--muted);font-size:11.5px;padding:6px 2px;border-radius:10px}
+.nav a.on{color:var(--primary);font-weight:650}
+.nav svg{width:22px;height:22px}
+@media (min-width:1000px){
+  .app{padding-bottom:0;padding-left:220px}
+  .nav{top:56px;bottom:0;right:auto;width:220px;flex-direction:column;border-top:0;border-right:1px solid var(--border);padding:12px}
+  .nav a{flex:0;flex-direction:row;gap:10px;font-size:14px;padding:10px 12px;justify-content:flex-start}
+  .nav a.on{background:var(--primary-soft)}
+  .topbar{padding-left:20px}
+}
+/* Primitives */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+.stack>*+*{margin-top:12px}
+.row{display:flex;gap:10px;align-items:center}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.xs{font-size:12px}
+h2{font-size:20px;margin:4px 0 2px}
+h3{font-size:16px;margin:0}
+.sec-title{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:18px 2px 8px;font-weight:650}
+.btn{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--primary);padding:8px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:10px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 11px;font-size:13px}
+.chip.on{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);font-weight:600}
+.tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-weight:600}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.tag.info{background:var(--info-soft);color:var(--info)}
+input[type=text],input[type=search],input[type=date],textarea,select{width:100%;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:11px 12px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+textarea{min-height:80px;resize:vertical}
+.dot{width:12px;height:12px;border-radius:50%;flex:none;background:var(--na-soft);border:2px solid var(--na)}
+.dot.cumple{background:var(--ok);border-color:var(--ok)}
+.dot.parcial{background:var(--warn);border-color:var(--warn)}
+.dot.no_cumple{background:var(--bad);border-color:var(--bad)}
+.dot.na{background:var(--na);border-color:var(--na)}
+.progress{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;display:flex}
+.progress i{display:block;height:100%}
+.alert{border-radius:12px;padding:11px 12px;font-size:13.5px;display:flex;gap:10px;align-items:flex-start;border:1px solid transparent}
+.alert.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.alert.info{background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 25%,transparent)}
+.alert.bad{background:var(--bad-soft)}
+.alert b{display:block;margin-bottom:2px}
+/* Home */
+.hero{background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 70%,#000));color:#fff;border-radius:18px;padding:18px}
+.hero h2{margin:0 0 4px;font-size:21px}
+.hero p{margin:0;opacity:.9;font-size:14px}
+.tiles{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:600px){.tiles{grid-template-columns:repeat(3,1fr)}}
+.tile{text-align:left;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:14px;text-decoration:none;color:var(--text);display:block;box-shadow:var(--shadow)}
+.tile .n{width:28px;height:28px;border-radius:8px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-weight:700;margin-bottom:8px}
+.tile b{display:block}
+/* Steps */
+.steps{display:flex;gap:6px;margin:4px 0 14px;overflow-x:auto;padding-bottom:2px}
+.step{flex:1;min-width:76px;text-align:center;font-size:12px;color:var(--muted)}
+.step i{display:block;height:4px;border-radius:9px;background:var(--border);margin-bottom:6px}
+.step.on{color:var(--primary);font-weight:650}
+.step.on i,.step.done i{background:var(--primary)}
+.select-card{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:12px}
+.select-card.on{border-color:var(--primary);background:var(--primary-soft)}
+.ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--surface-2);flex:none;color:var(--primary)}
+.ico svg{width:22px;height:22px}
+.doc{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border)}
+.doc:first-child{border-top:0;padding-top:0}
+.drop{border:2px dashed var(--border);border-radius:var(--radius);padding:18px;text-align:center;color:var(--muted);display:block;cursor:pointer;background:var(--surface)}
+.drop:hover{border-color:var(--primary);color:var(--primary)}
+.log{font:12.5px/1.6 ui-monospace,Consolas,monospace;background:var(--surface-2);border-radius:12px;padding:12px;min-height:120px}
+.log div{opacity:0;animation:fade .3s forwards}
+@keyframes fade{to{opacity:1}}
+.req{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.req+.req{margin-top:8px}
+.req.off{opacity:.5}
+.req .t{font-weight:600}
+.src{font-size:12px;color:var(--muted)}
+.sticky-foot{position:sticky;bottom:84px;z-index:10;margin-top:14px}
+@media (min-width:1000px){.sticky-foot{bottom:12px}}
+/* Terreno */
+.tabs{display:flex;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px}
+.tabs button{flex:1;border:0;background:transparent;padding:9px;border-radius:9px;font-weight:600;color:var(--muted)}
+.tabs button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.group{margin-top:14px}
+.group>summary{list-style:none;display:flex;align-items:center;gap:8px;font-weight:650;padding:8px 2px;cursor:pointer}
+.group>summary::-webkit-details-marker{display:none}
+.group>summary .cnt{margin-left:auto;font-weight:500}
+.item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text)}
+.item+.item{margin-top:8px}
+.item .t{font-weight:600;font-size:14.5px}
+.chev{color:var(--muted);flex:none}
+.fab{position:fixed;right:16px;bottom:96px;z-index:25;width:58px;height:58px;border-radius:50%;border:0;background:var(--primary);color:var(--primary-ink);box-shadow:0 6px 18px rgba(0,0,0,.25);display:grid;place-items:center}
+.fab svg{width:26px;height:26px}
+@media (min-width:1000px){.fab{bottom:24px;right:24px}}
+/* Detalle */
+.status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (min-width:520px){.status-grid{grid-template-columns:repeat(4,1fr)}}
+.st{border:2px solid var(--border);background:var(--surface);border-radius:14px;padding:14px 8px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:6px}
+.st .dot{width:18px;height:18px}
+.st.on.cumple{border-color:var(--ok);background:var(--ok-soft)}
+.st.on.parcial{border-color:var(--warn);background:var(--warn-soft)}
+.st.on.no_cumple{border-color:var(--bad);background:var(--bad-soft)}
+.st.on.na{border-color:var(--na);background:var(--na-soft)}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.ev{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:12px}
+.ev img{width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--surface-2)}
+.ev .ph{width:56px;height:56px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;font-size:11px;color:var(--muted);font-weight:700}
+.hist{font-size:13px;border-left:2px solid var(--border);padding-left:12px}
+.hist div{position:relative;padding:4px 0}
+.hist div::before{content:"";position:absolute;left:-17px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--primary)}
+/* Panel */
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (min-width:600px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.kpi .v{font-size:26px;font-weight:750;line-height:1.1}
+.kpi .l{font-size:12.5px;color:var(--muted)}
+.inst{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:700px){.inst{grid-template-columns:repeat(3,1fr)}}
+.ring{width:64px;height:64px;flex:none}
+.bar-row{display:grid;grid-template-columns:minmax(110px,40%) 1fr 42px;gap:10px;align-items:center;font-size:13px;padding:5px 0}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;gap:5px;align-items:center}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* Chat */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;height:82vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column}
+@media (min-width:700px){.sheet-bg{align-items:center}.sheet{border-radius:18px;height:640px}}
+.sheet header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.msgs{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:86%;padding:10px 12px;border-radius:14px;font-size:14px;white-space:pre-wrap}
+.msg.me{align-self:flex-end;background:var(--primary);color:var(--primary-ink);border-bottom-right-radius:4px}
+.msg.bot{align-self:flex-start;background:var(--surface-2);border-bottom-left-radius:4px}
+.msg .src{margin-top:6px}
+.chat-in{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border)}
+.sugs{display:flex;gap:6px;overflow-x:auto;padding:0 12px 10px}
+.sugs button{white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:60;font-size:14px;max-width:90vw;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.empty{text-align:center;padding:30px 10px;color:var(--muted)}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    <h1 id="hdr">Auditorías por instalación<small id="hdr-sub">Piscicultura Aucha</small></h1>
+    <span class="net" id="net">En línea</span>
+    <button class="theme-btn" id="theme-btn" data-action="theme" aria-label="Cambiar a modo oscuro" title="Cambiar tema"></button>
+  </header>
+  <nav class="nav" id="nav"></nav>
+  <main class="main" id="view"></main>
+</div>
+<button class="fab hide" id="fab" aria-label="Abrir chat de normativa" data-action="chat-open">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
+<div id="overlay"></div>
+<input type="file" id="file-doc" accept="application/pdf,.pdf,.doc,.docx" class="hide">
+<input type="file" id="file-pert" accept="application/pdf,.pdf" class="hide">
+<input type="file" id="file-photo" accept="image/*" capture="environment" class="hide">
+<input type="file" id="file-any" accept="image/*,application/pdf,.pdf,.xlsx,.docx" class="hide">
+
+<script>
+/* =========================================================================
+   DATOS DE EJEMPLO
+   Extraídos manualmente de los documentos del reto (RCA 202410001185,
+   Rectificación RCA, Res. Sanitaria SUSPEL y Res. Sanitaria RESPEL).
+   El formato de REQ_TEMPLATES es el contrato que debería devolver el
+   módulo de extracción con LLM.
+   ========================================================================= */
+const INSTALACIONES = [
+  { id:'aucha', nombre:'Piscicultura Aucha', tipo:'Piscicultura', lugar:'Sector Aucha, Calbuco, Los Lagos', real:true },
+  { id:'ces', nombre:'Centro de cultivo Ejemplo', tipo:'Centro de cultivo (CES)', lugar:'Datos ficticios', real:false, demo:{ pct:72, avance:100, nc:3, total:28 } },
+  { id:'planta', nombre:'Planta de proceso Ejemplo', tipo:'Planta', lugar:'Datos ficticios', real:false, demo:{ pct:86, avance:64, nc:1, total:41 } },
+];
+
+const DOCS_AUCHA = [
+  { id:'D1', tipo:'RCA', numero:'Res. Ex. N° 202410001185', fecha:'2024-09-13', emisor:'Comisión de Evaluación Región de Los Lagos', titulo:'Califica ambientalmente la DIA “Ampliación Piscicultura de Recirculación Aucha”', vigencia:'Vigente · modificada por rectificación', estado:'warn' },
+  { id:'D2', tipo:'Rectificación', numero:'Documento N° 202410101706', fecha:'2024-12-19', emisor:'SEA Región de Los Lagos', titulo:'Rectifica 33 considerandos de la RCA 202410001185', vigencia:'Vigente', estado:'ok' },
+  { id:'D3', tipo:'Res. sanitaria', numero:'Res. Ex. N° 2310322819', fecha:'2023-09-14', emisor:'SEREMI de Salud Los Lagos', titulo:'Autoriza almacenamiento de sustancias peligrosas (SUSPEL)', vigencia:'Vigente · prórroga automática desde 14-09-2026', estado:'ok' },
+  { id:'D4', tipo:'Res. sanitaria', numero:'Res. Ex. N° 241020665', fecha:'2024-01-23', emisor:'SEREMI de Salud Los Lagos', titulo:'Autoriza sitio de almacenamiento de residuos peligrosos (RESPEL)', vigencia:'Vigente · requiere rectificar superficie', estado:'warn' },
+];
+
+const PERT_AUCHA = [
+  { id:'P1', numero:'Res. Ex. N° 20211010180/21', titulo:'Consulta de pertinencia de ingreso al SEIA', cargada:false },
+  { id:'P2', numero:'Res. Ex. N° 202310101465/23', titulo:'Consulta de pertinencia de ingreso al SEIA', cargada:false },
+];
+
+const NORMAS_CITADAS = ['D.S. 90/2000 (descargas de RILes)','D.S. 38/2011 (ruido)','D.S. 148/2003 (residuos peligrosos)','D.S. 43/2015 (sustancias peligrosas)','D.S. 320/2001 (RAMA)','Res. Ex. 885/2016 SMA (reporte de contingencias)'];
+
+const ALERTAS = [
+  { tipo:'warn', titulo:'Inconsistencia entre documentos', texto:'La Res. Sanitaria RESPEL 241020665 indica 90 m² para la bodega; la RCA (Cons. 6.2.4) señala que lo correcto es 36 m² y que la resolución debe rectificarse.' },
+  { tipo:'warn', titulo:'Documento relacionado no cargado', texto:'La RCA 202410001185 modifica la RCA N° 49/2017 del proyecto original. Cárgala para completar los requisitos heredados.' },
+  { tipo:'info', titulo:'Rectificación aplicada', texto:'La rectificación del 19-12-2024 cambió 4 requisitos (grupo electrógeno 150→50 kVA, retiro de residuos 2→1 por semana, inicio del PSA y limpieza de playas).' },
+];
+
+// fuente.doc → id de DOCS_AUCHA; venc en formato AAAA-MM-DD
+const REQ_TEMPLATES = [
+  { id:'R01', tema:'Ruido', titulo:'Monitoreo anual de ruido en operación', detalle:'Medición diurna en receptores R01–R08 y nocturna en R01–R07 según D.S. 38/2011, en la condición crítica de la planta. Informe técnico con fichas de la Res. Ex. 693 SMA/15 y procedimiento Res. Ex. 867 SMA/16.', fuente:{doc:'D1', ref:'Cons. 4.3.2, Tabla 2 · CAV 8.9'}, frecuencia:'Anual', evidencia:'Informe técnico de medición de ruido', venc:'2027-02-28' },
+  { id:'R02', tema:'Ruido', titulo:'Silenciadores de escape en grupos electrógenos (−13 dB)', detalle:'Mejora del silenciador de escape con atenuación de 13 dB en el grupo de 50 kVA (sector L2), los 2 grupos de 635 kVA y los 4 de 750 kVA.', fuente:{doc:'D1', ref:'Cons. 4.3.2 · rectificado en D2'}, frecuencia:'Verificación única', evidencia:'Ficha técnica y foto de cada equipo', rectificado:'La rectificación corrige el grupo de L2: de 150 kVA a 50 kVA.' },
+  { id:'R03', tema:'Ruido', titulo:'Atenuadores acústicos en ventiladores de estanques', detalle:'Atenuadores de 10 dB en los ventiladores superiores de los 10 estanques más cercanos al receptor R02.', fuente:{doc:'D1', ref:'Cons. 4.3.2'}, frecuencia:'Verificación única', evidencia:'Fotos de los 10 estanques' },
+  { id:'R04', tema:'Efluentes (RILes)', titulo:'Descarga cumple Tabla 5 del D.S. 90/2000 y caudal máx. 429 L/s', detalle:'El efluente tratado se descarga por emisario cumpliendo la Tabla 5 del D.S. 90/2000 y sin superar el caudal máximo de 429 L/s.', fuente:{doc:'D1', ref:'Cons. 4.3.2 · Tabla 6.2.2'}, frecuencia:'Continua', evidencia:'Resultados de laboratorio y registro de caudal' },
+  { id:'R05', tema:'Efluentes (RILes)', titulo:'Autocontrol mensual del efluente', detalle:'Mientras no exista resolución de monitoreo de la SMA: aceites y grasas ≤150 mg/L, pH 5,5–9, sólidos sedimentables ≤20 ml/L/h, SST ≤300 mg/L y SAAM ≤15 mg/L.', fuente:{doc:'D1', ref:'Tabla 6.2.2 d) · Tabla 3'}, frecuencia:'Mensual', evidencia:'Informe de laboratorio del mes', venc:'2026-10-31' },
+  { id:'R06', tema:'Efluentes (RILes)', titulo:'Chequeo diario de la planta de RILes', detalle:'Revisión visual diaria de filtros rotatorios, planta elevadora (PEAS), dosificación de polímero y desinfección UV, con registro en bitácora.', fuente:{doc:'D1', ref:'Tabla 9.1 · 9.2'}, frecuencia:'Diaria', evidencia:'Bitácora de chequeo diario' },
+  { id:'R07', tema:'Medio marino', titulo:'Plan de Seguimiento Ambiental del medio marino', detalle:'2 campañas al año (estival e invernal) en las estaciones PD, E1–E4, C1 y C2, ejecutadas por una ETFA. Informe a la SMA en un plazo de 90 días. Mínimo 3 años.', fuente:{doc:'D1', ref:'CAV 8.1 · rectificado en D2'}, frecuencia:'Semestral', evidencia:'Informe de campaña y comprobante SMA', venc:'2026-12-15', rectificado:'La rectificación fija el inicio del PSA en la fase de construcción (antes: operación).' },
+  { id:'R08', tema:'Medio marino', titulo:'Filmación e inspección anual del emisario submarino', detalle:'Filmación de la estructura del emisario en 2 campañas por año, lista de chequeo anual de inspección y limpieza y mantención anual.', fuente:{doc:'D2', ref:'Cons. 4.3.2 · Tabla 9.2 (10)'}, frecuencia:'Semestral', evidencia:'Video de filmación y lista de chequeo' },
+  { id:'R09', tema:'Residuos no peligrosos', titulo:'Lodos del tratamiento en contenedores herméticos', detalle:'2 contenedores herméticos de 15 m³ dentro de galpón con losa de hormigón; retiro al menos 1 vez por semana por empresa autorizada.', fuente:{doc:'D1', ref:'Tabla 6.2.3'}, frecuencia:'Semanal', evidencia:'Guía de despacho del retiro', venc:'2026-10-24' },
+  { id:'R10', tema:'Residuos no peligrosos', titulo:'Retiro semanal de residuos industriales no peligrosos', detalle:'Plásticos, cartones y papeles en contenedor hermético de 22 m³, con retiro 1 vez por semana y prioridad a reciclaje.', fuente:{doc:'D2', ref:'Cons. 4.3.2 (ICE 4.7.6.1)'}, frecuencia:'Semanal', evidencia:'Guía de despacho del retiro', rectificado:'La rectificación cambia la frecuencia de 2 a 1 retiro por semana.' },
+  { id:'R11', tema:'Residuos no peligrosos', titulo:'Residuos domiciliarios en contenedor hermético', detalle:'Contenedor de 22 m³ permanentemente tapado; retiro semanal o según necesidad, sin superar el 80% de su capacidad.', fuente:{doc:'D1', ref:'Tabla 6.2.3'}, frecuencia:'Semanal', evidencia:'Foto del contenedor y guía de retiro' },
+  { id:'R12', tema:'Ensilaje y mortalidad', titulo:'Registro diario de ensilaje (pH ≤ 4)', detalle:'Registrar diariamente la mortalidad, el pH de la pasta (≤4) y el ácido fórmico usado. Programar el retiro antes del 80% de capacidad de los silos.', fuente:{doc:'D1', ref:'Tabla 6.2.3 c.4'}, frecuencia:'Diaria', evidencia:'Planilla diaria de ensilaje' },
+  { id:'R13', tema:'Ensilaje y mortalidad', titulo:'Pretil de contención y ducha lavaojos', detalle:'Sistema de ensilaje sobre losa con pretil (≈16,8 m³) capaz de contener el 100% del estanque de acopio, y ducha lavaojos junto a la plataforma.', fuente:{doc:'D1', ref:'Tabla 6.2.3 c.1 · Tabla 9.12'}, frecuencia:'Verificación única', evidencia:'Fotos del pretil y de la ducha' },
+  { id:'R14', tema:'Aguas servidas', titulo:'Retiro de lodos de la PTAS', detalle:'Lodos de la planta de aguas servidas (≈5 kg/día) retirados aprox. 3 veces al año por empresa autorizada.', fuente:{doc:'D1', ref:'Tabla 6.2.1 i)'}, frecuencia:'Cuatrimestral', evidencia:'Guía de retiro con camión limpiafosas' },
+  { id:'R15', tema:'Agua', titulo:'Monitoreo de nivel freático del acuífero somero', detalle:'Medición diaria en el piezómetro Pi1 (junto a los pozos 3 y 4). Informe semestral a la SMA durante los primeros 4 años y luego anual.', fuente:{doc:'D1', ref:'CAV 8.15'}, frecuencia:'Diaria · informe semestral', evidencia:'Serie de datos e informe a SMA', venc:'2027-01-31' },
+  { id:'R16', tema:'Agua', titulo:'Inspección de fosos y contrafosos de aguas lluvia', detalle:'Inspección visual semanal en operación y limpieza general anual antes de la temporada de lluvias, con bitácora digital.', fuente:{doc:'D1', ref:'CAV 8.11'}, frecuencia:'Semanal', evidencia:'Bitácora y fotos' },
+  { id:'R17', tema:'Comunidad', titulo:'Gestión del canal de reclamos', detalle:'Formalizar los reclamos recibidos en un máximo de 24 h y responder en un máximo de 15 días hábiles. Informe anual de reclamos.', fuente:{doc:'D1', ref:'CAV 8.6'}, frecuencia:'Por evento · informe anual', evidencia:'Registro de reclamos y respuestas' },
+  { id:'R18', tema:'Comunidad', titulo:'Reunión anual de difusión de resultados', detalle:'Presentar a la comunidad los resultados del Plan de Seguimiento Ambiental y del monitoreo de ruido, con registro de asistencia.', fuente:{doc:'D1', ref:'CAV 8.2 · 8.10'}, frecuencia:'Anual', evidencia:'Registro de asistencia y presentación' },
+  { id:'R19', tema:'Comunidad', titulo:'Encuentros de diálogo comunitario', detalle:'Al menos 2 encuentros al año con acta de temas, acuerdos y plazos, registro de asistentes y fotos.', fuente:{doc:'D1', ref:'CAV 8.3'}, frecuencia:'Semestral', evidencia:'Acta y registro fotográfico' },
+  { id:'R20', tema:'Borde costero', titulo:'Limpieza mensual de playa', detalle:'Limpieza mensual del sector costero aledaño con Registro de Playas Limpias (fecha, participantes, residuos extraídos, fotos) y copia de la guía de despacho. Informe semestral a la SMA.', fuente:{doc:'D2', ref:'CAV 8.14'}, frecuencia:'Mensual', evidencia:'Registro de playas limpias y guía de despacho', venc:'2026-10-31', rectificado:'La rectificación exige copia de la guía de despacho como indicador.' },
+  { id:'R21', tema:'Capacitación', titulo:'Capacitación anual en buenas prácticas ambientales', detalle:'Charla anual (y a cada trabajador nuevo) sobre operación, planes de contingencia, manejo de residuos, químicos e hidrocarburos.', fuente:{doc:'D1', ref:'CAV 8.8'}, frecuencia:'Anual', evidencia:'Registro de asistencia y contenidos' },
+  { id:'R22', tema:'Capacitación', titulo:'Capacitación en conservación de mamíferos marinos', detalle:'Inducción a todos los trabajadores sobre la normativa de avistamiento, acercamiento y captura de mamíferos marinos.', fuente:{doc:'D1', ref:'CAV 8.19'}, frecuencia:'Anual', evidencia:'Registro de capacitación' },
+  { id:'R23', tema:'Paisaje y flora', titulo:'Monitoreo de la cortina vegetal', detalle:'Seguimiento anual (hasta 5 años) de la barrera vegetal hacia la ruta V-891 y el mar, con replante si es necesario e informe a la SMA.', fuente:{doc:'D1', ref:'CAV 8.18'}, frecuencia:'Anual', evidencia:'Informe fotográfico' },
+  { id:'R24', tema:'Contingencias', titulo:'Aviso a la SMA en menos de 24 h', detalle:'Ante cualquier contingencia que afecte agua, aire, suelo, biodiversidad o medio humano, reportar en el Sistema de Seguimiento Ambiental según Res. Ex. 885/2016.', fuente:{doc:'D1', ref:'Considerando 9'}, frecuencia:'Por evento', evidencia:'Comprobante de reporte' },
+  { id:'R25', tema:'Contingencias', titulo:'Simulacros de incendio y mantención de extintores', detalle:'Simulacros registrados, mantención anual de equipos contra incendio por servicio autorizado y mapa de salidas y extintores.', fuente:{doc:'D1', ref:'Tabla 9.3'}, frecuencia:'Anual', evidencia:'Reporte de simulacro y certificado de mantención' },
+  { id:'R26', tema:'Sustancias peligrosas', titulo:'Declaración semestral de sustancias peligrosas', detalle:'Declarar el almacenamiento de sustancias peligrosas dos veces al año, con plazo máximo el 20 de junio y el 20 de diciembre (art. 5 D.S. 43/15).', fuente:{doc:'D3', ref:'Resuelvo 4'}, frecuencia:'Semestral', evidencia:'Comprobante de declaración', venc:'2026-12-20' },
+  { id:'R27', tema:'Sustancias peligrosas', titulo:'Condiciones de la bodega SUSPEL', detalle:'Capacidad máxima de 9,5 t; clases 8, 5.1, 3 y 9 en envases portátiles; muros RF 180 min; detección automática de humo. Cualquier ampliación o traslado requiere nueva autorización.', fuente:{doc:'D3', ref:'Resuelvo 2, 3 y 5'}, frecuencia:'Verificación en terreno', evidencia:'Fotos e inventario de la bodega' },
+  { id:'R28', tema:'Residuos peligrosos', titulo:'Almacenamiento de RESPEL menor a 6 meses', detalle:'Ningún residuo peligroso puede superar 6 meses en bodega (art. 31 D.S. 148/2003). Control mediante la planilla “Control de Inventario Bodega RESPEL”.', fuente:{doc:'D4', ref:'Resuelvo 2 · RCA 6.2.4'}, frecuencia:'Mensual', evidencia:'Inventario actualizado' },
+  { id:'R29', tema:'Residuos peligrosos', titulo:'Registro de ingreso y salida de RESPEL', detalle:'Sistema de registro de ingreso al sitio y salida a la instalación de eliminación, mantenido permanentemente actualizado.', fuente:{doc:'D4', ref:'Resuelvo 2'}, frecuencia:'Continua', evidencia:'Registro y guías de salida' },
+  { id:'R30', tema:'Residuos peligrosos', titulo:'Etiquetado NCh 2190 y hojas de seguridad', detalle:'Contenedores en buen estado y etiquetados según NCh 2190 Of.93; hojas de seguridad disponibles en la bodega.', fuente:{doc:'D4', ref:'Resuelvo 2 y 5'}, frecuencia:'Verificación en terreno', evidencia:'Fotos de etiquetas y HDS' },
+  { id:'R31', tema:'Residuos peligrosos', titulo:'Protocolos y plan de emergencia del sitio RESPEL', detalle:'Mantener protocolos de operación actualizados y un plan para enfrentar emergencias en el sitio de almacenamiento.', fuente:{doc:'D4', ref:'Resuelvo 5'}, frecuencia:'Anual', evidencia:'Documento vigente del plan' },
+  { id:'R32', tema:'Residuos peligrosos', titulo:'Rectificar superficie en la Res. Sanitaria RESPEL', detalle:'La resolución indica 90 m², pero la superficie correcta es 36 m². Debe rectificarse ante la Autoridad Sanitaria.', fuente:{doc:'D1', ref:'Tabla 6.2.4 a)'}, frecuencia:'Gestión única', evidencia:'Solicitud o resolución rectificada' },
+  { id:'R33', tema:'Olores', titulo:'Buenas prácticas en filtro tornillo y ductos', detalle:'Retiro frecuente de material biológico, mantención de filtros, retiro de lodos con condiciones meteorológicas favorables y revisión del ducto del pozo de lodos.', fuente:{doc:'D1', ref:'Cons. 4.3.2, Tabla 3'}, frecuencia:'Semanal', evidencia:'Registro de mantención' },
+  { id:'R34', tema:'Gestión y reportes', titulo:'Declaración mensual en RETC / SINADER', detalle:'Declarar mensualmente los RILes (según resolución de monitoreo) y los residuos en la Ventanilla Única del RETC.', fuente:{doc:'D1', ref:'Tabla 7.2.4 · 7.3.3'}, frecuencia:'Mensual', evidencia:'Comprobante de declaración', venc:'2026-11-10' },
+  { id:'R35', tema:'Gestión y reportes', titulo:'Informar a la SMA el inicio de cada fase', detalle:'Avisar a la SMA con al menos una semana de anticipación el inicio de cada fase del proyecto.', fuente:{doc:'D1', ref:'Considerando 12'}, frecuencia:'Por evento', evidencia:'Comprobante de aviso' },
+];
+
+/* =========================================================================
+   ESTADO (persistido en el teléfono para trabajar sin conexión)
+   ========================================================================= */
+const KEY = 'auditorias-proto-v1';
+const ESTADOS = { cumple:'Cumple', parcial:'Parcial', no_cumple:'No cumple', na:'No aplica', pendiente:'Pendiente' };
+
+function freshState(){
+  return {
+    inst:'aucha', step:1,
+    docs: DOCS_AUCHA.map(d=>({...d})),
+    perts: PERT_AUCHA.map(p=>({...p})),
+    extras: [],
+    audit:{ status:'sin_preparar', nombre:'Auditoría interna Q4 2026', validador:'', publicada:null },
+    reqs:[], temasOff:[], editing:null,
+    tab:'pend', q:'', pending:0, chat:[]
+  };
+}
+let S;
+function load(){ try{ const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : freshState(); }catch(e){ S = freshState(); } }
+function save(markPending){ if(markPending){ S.pending++; scheduleSync(); } try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+/* =========================================================================
+   UTILIDADES
+   ========================================================================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = iso => { if(!iso) return '—'; const [y,m,d] = iso.slice(0,10).split('-'); return `${d}-${m}-${y}`; };
+const nowISO = () => new Date().toISOString();
+const daysTo = iso => Math.ceil((new Date(iso+'T23:59:59') - new Date())/86400000);
+const docById = id => id==='MANUAL' ? {numero:'', tipo:'Criterio del responsable'} : (S.docs.find(d=>d.id===id) || S.extras.find(d=>d.id===id) || S.perts.find(d=>d.id===id) || {numero:id, tipo:''});
+const activeReqs = () => S.reqs.filter(r=>r.val==='validado');
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function dueTag(iso){ if(!iso) return ''; const d=daysTo(iso); const cls = d<0?'bad':d<=14?'warn':'info'; const txt = d<0?`Vencido hace ${-d} d`:d===0?'Vence hoy':`Vence en ${d} d`; return `<span class="tag ${cls}">${txt}</span>`; }
+
+function stats(list){
+  const s={total:list.length,cumple:0,parcial:0,no_cumple:0,na:0,pendiente:0};
+  list.forEach(r=>s[r.estado||'pendiente']++);
+  const evaluados = s.cumple+s.parcial+s.no_cumple;
+  s.llenos = s.total - s.pendiente;
+  s.avance = s.total ? Math.round(s.llenos/s.total*100) : 0;
+  s.pct = evaluados ? Math.round((s.cumple + s.parcial*0.5)/evaluados*100) : null;
+  return s;
+}
+
+const ICONS = {
+  home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  prep:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>',
+  field:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  panel:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',
+  fish:'<path d="M2 12s4-6 11-6c4 0 7 3 9 6-2 3-5 6-9 6-7 0-11-6-11-6z"/><circle cx="16" cy="11" r="1"/><path d="M2 12l-0 0"/>',
+  boat:'<path d="M3 17l2 4h14l2-4z"/><path d="M12 3v12"/><path d="M12 4l6 9H6z"/>',
+  factory:'<path d="M3 21V9l6 4V9l6 4V5h6v16z"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  chev:'<path d="M9 18l6-6-6-6"/>',
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  cam:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  clip:'<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  x:'<path d="M18 6L6 18M6 6l12 12"/>',
+  send:'<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+};
+
+/* ---------- Tema claro / oscuro (elegido por el usuario, por defecto claro) ---------- */
+const THEME_KEY = 'auditorias-tema';
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  const b = $('#theme-btn');
+  b.innerHTML = icon(t==='dark'?'sun':'moon', 18);
+  b.setAttribute('aria-label', t==='dark'?'Cambiar a modo claro':'Cambiar a modo oscuro');
+  document.querySelector('meta[name=theme-color]').content = t==='dark' ? '#172026' : '#0f5c6e';
+}
+function getTheme(){ try{ return localStorage.getItem(THEME_KEY)==='dark' ? 'dark' : 'light'; }catch(e){ return 'light'; } }
+function toggleTheme(){ const t = getTheme()==='dark' ? 'light' : 'dark'; try{ localStorage.setItem(THEME_KEY, t); }catch(e){} applyTheme(t); }
+const icon = (n, size=22) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+
+/* =========================================================================
+   VISTAS
+   ========================================================================= */
+function route(){ return (location.hash.replace(/^#\/?/,'') || 'inicio').split('/'); }
+
+function renderNav(){
+  const [r] = route();
+  const items = [['inicio','Inicio','home'],['preparar','Preparar','prep'],['terreno','Terreno','field'],['panel','Panel','panel']];
+  $('#nav').innerHTML = items.map(([id,l,ic])=>`<a href="#/${id}" class="${(r===id||(r==='req'&&id==='terreno'))?'on':''}">${icon(ic)}<span>${l}</span></a>`).join('');
+}
+
+function viewInicio(){
+  const st = stats(activeReqs());
+  const pub = S.audit.status==='publicada';
+  return `<div class="stack">
+    <div class="hero">
+      <h2>Auditoría de cumplimiento ambiental</h2>
+      <p>Requisitos generados desde la RCA y las resoluciones de cada instalación, validados por un responsable y llenados en terreno con evidencias.</p>
+    </div>
+    <div class="card">
+      <div class="row"><div class="grow"><h3>${esc(S.audit.nombre)}</h3><div class="small muted">Piscicultura Aucha · ${pub?`publicada el ${fmtDate(S.audit.publicada)}`:S.audit.status==='en_validacion'?'requisitos en validación':'sin preparar'}</div></div>
+      <span class="tag ${pub?'ok':S.audit.status==='en_validacion'?'warn':''}">${pub?'En terreno':S.audit.status==='en_validacion'?'En validación':'Borrador'}</span></div>
+      ${pub?`<div style="margin-top:12px">${progressBar(st)}</div><div class="small muted" style="margin-top:6px">${st.llenos} de ${st.total} requisitos llenados · ${st.pct==null?'sin evaluar':st.pct+'% de cumplimiento'}</div>`:''}
+    </div>
+    <div class="sec-title">Flujo de trabajo</div>
+    <div class="tiles">
+      <a class="tile" href="#/preparar"><div class="n">1</div><b>Antes de ir al lugar</b><span class="small muted">Elige el centro, carga la RCA y las pertinencias, genera y valida los requisitos.</span></a>
+      <a class="tile" href="#/terreno"><div class="n">2</div><b>Trabajo en terreno</b><span class="small muted">Checklist con semáforo y evidencias. Funciona sin conexión.</span></a>
+      <a class="tile" href="#/panel"><div class="n">3</div><b>Panel de cumplimiento</b><span class="small muted">Estado por instalación, vencimientos y hallazgos.</span></a>
+    </div>
+    ${S.audit.status==='sin_preparar'?`<div class="card row wrap"><div class="grow small"><b>¿Presentando?</b><br><span class="muted">Carga una auditoría de ejemplo ya validada y con avance para ir directo a terreno y al panel.</span></div><button class="btn sm" data-action="demo">Cargar ejemplo</button></div>`:''}
+    <div class="sec-title">Alertas detectadas en los documentos</div>
+    ${ALERTAS.map(alertHTML).join('')}
+    <div class="row" style="justify-content:center;margin-top:18px"><button class="btn ghost small" data-action="reset">Reiniciar prototipo</button></div>
+  </div>`;
+}
+function alertHTML(a){ return `<div class="alert ${a.tipo}" style="margin-bottom:8px"><div><b>${esc(a.titulo)}</b>${esc(a.texto)}</div></div>`; }
+
+function progressBar(st){
+  const w = k => st.total ? (st[k]/st.total*100) : 0;
+  return `<div class="progress" role="img" aria-label="Avance">
+    <i style="width:${w('cumple')}%;background:var(--ok)"></i><i style="width:${w('parcial')}%;background:var(--warn)"></i><i style="width:${w('no_cumple')}%;background:var(--bad)"></i><i style="width:${w('na')}%;background:var(--na)"></i></div>`;
+}
+
+/* ---------- Preparar (wizard) ---------- */
+function viewPreparar(){
+  const steps = ['Centro','Documentos','Pertinencias','Requisitos'];
+  const head = `<h2>Preparar auditoría</h2><p class="muted small" style="margin:0 0 10px">Antes de ir al lugar</p>
+    <div class="steps">${steps.map((s,i)=>`<div class="step ${S.step===i+1?'on':S.step>i+1?'done':''}"><i></i>${i+1}. ${s}</div>`).join('')}</div>`;
+  return head + [null,prepCentro,prepDocs,prepPerts,prepReqs][S.step]();
+}
+function prepCentro(){
+  const ic = {aucha:'fish',ces:'boat',planta:'factory'};
+  return `<div class="stack">
+    ${INSTALACIONES.map(i=>`<button class="select-card ${S.inst===i.id?'on':''}" data-action="pick-inst" data-id="${i.id}">
+      <span class="ico">${icon(ic[i.id])}</span><span class="grow"><b>${esc(i.nombre)}</b><br><span class="small muted">${esc(i.tipo)} · ${esc(i.lugar)}</span></span>
+      ${i.real?'<span class="tag ok">4 docs</span>':'<span class="tag">ejemplo</span>'}</button>`).join('')}
+    ${S.inst!=='aucha'?`<div class="alert info"><div>En este prototipo solo la Piscicultura Aucha tiene documentos reales del reto. Las otras instalaciones muestran datos ficticios en el panel.</div></div>`:''}
+    <div class="sticky-foot"><button class="btn primary block" data-action="step" data-n="2" ${S.inst!=='aucha'?'disabled':''}>Continuar</button></div>
+  </div>`;
+}
+function prepDocs(){
+  return `<div class="stack">
+    <div class="card">
+      <h3>Documentos de la instalación</h3>
+      <p class="small muted" style="margin:4px 0 12px">RCA, resoluciones sectoriales o normas. El sistema verifica vigencia y si fueron modificados.</p>
+      ${[...S.docs, ...S.extras].map(d=>`<div class="doc"><span class="ico">${icon('file')}</span><div class="grow">
+        <div class="row wrap" style="gap:6px"><span class="tag">${esc(d.tipo)}</span><span class="tag ${d.estado||'info'}">${esc(d.vigencia||'Por procesar')}</span></div>
+        <div style="font-weight:600;margin-top:4px">${esc(d.numero)}</div>
+        <div class="small muted">${esc(d.titulo)}${d.fecha?` · ${fmtDate(d.fecha)}`:''}</div></div></div>`).join('')}
+    </div>
+    <label class="drop" for="file-doc">${icon('clip')}<br><b>Cargar documento</b><br><span class="small">PDF de RCA, resolución sectorial o norma</span></label>
+    <div class="sticky-foot row"><button class="btn" data-action="step" data-n="1">Atrás</button><button class="btn primary grow" data-action="step" data-n="3">Continuar</button></div>
+  </div>`;
+}
+function prepPerts(){
+  return `<div class="stack">
+    <div class="card">
+      <h3>Pertinencias</h3>
+      <p class="small muted" style="margin:4px 0 12px">Normas adicionales que el centro debe cumplir. Cada centro está asociado al SEIA, donde están sus pertinencias.</p>
+      ${S.perts.map(p=>`<div class="doc"><span class="ico">${icon('file')}</span><div class="grow">
+        <div style="font-weight:600">${esc(p.numero)}</div><div class="small muted">${esc(p.titulo)} · citada en la RCA</div></div>
+        ${p.cargada?'<span class="tag ok">Cargada</span>':`<button class="btn sm" data-action="pert-load" data-id="${p.id}">Cargar</button>`}</div>`).join('')}
+    </div>
+    <label class="drop" for="file-pert">${icon('clip')}<br><b>Agregar otra pertinencia</b></label>
+    <div class="card"><h3>Normas citadas detectadas</h3><div class="row wrap" style="gap:6px;margin-top:10px">${NORMAS_CITADAS.map(n=>`<span class="chip">${esc(n)}</span>`).join('')}</div></div>
+    <div class="sticky-foot row"><button class="btn" data-action="step" data-n="2">Atrás</button><button class="btn primary grow" data-action="step" data-n="4">Continuar</button></div>
+  </div>`;
+}
+function prepReqs(){
+  if(!S.reqs.length){
+    return `<div class="stack"><div class="card">
+      <h3>Generar listado de requisitos</h3>
+      <p class="small muted" style="margin:4px 0 12px">Se leerán ${S.docs.length + S.extras.length} documentos y ${S.perts.filter(p=>p.cargada).length} pertinencias para identificar las obligaciones aplicables.</p>
+      <div class="log" id="log"><span class="muted">Listo para procesar.</span></div>
+    </div>
+    <div class="sticky-foot row"><button class="btn" data-action="step" data-n="3">Atrás</button><button class="btn primary grow" data-action="generate" id="gen-btn">Generar requisitos</button></div></div>`;
+  }
+  const temas = [...new Set(S.reqs.map(r=>r.tema))];
+  const sel = S.reqs.filter(r=>r.val!=='descartado' && !S.temasOff.includes(r.tema));
+  const published = S.audit.status==='publicada';
+  return `<div class="stack">
+    <div class="alert info"><div><b>Validación obligatoria</b>Los requisitos generados automáticamente deben ser revisados por un responsable antes de usarse en la auditoría.</div></div>
+    <div class="card"><h3>Temáticas de la auditoría</h3><p class="small muted" style="margin:4px 0 10px">Elige qué temáticas forman parte de esta auditoría.</p>
+      <div class="row wrap" style="gap:6px">${temas.map(t=>`<button class="chip ${S.temasOff.includes(t)?'':'on'}" data-action="toggle-tema" data-t="${esc(t)}">${esc(t)} · ${S.reqs.filter(r=>r.tema===t&&r.val!=='descartado').length}</button>`).join('')}</div></div>
+    ${S.adding ? addFormHTML(temas) : `<button class="btn block" data-action="add-open">+ Agregar requisito que no detectó el análisis</button>`}
+    ${temas.filter(t=>!S.temasOff.includes(t)).map(t=>`<div><div class="sec-title">${esc(t)}</div>
+      ${S.reqs.filter(r=>r.tema===t).map(reqValHTML).join('')}</div>`).join('')}
+    <div class="card sticky-foot stack ${S.adding?'hide':''}">
+      ${published?`<div class="small"><b>Auditoría publicada</b> por ${esc(S.audit.validador)} el ${fmtDate(S.audit.publicada)}. Los cambios aquí se reflejan en terreno.</div>`:`
+      <label class="small" for="validador"><b>Responsable que valida</b></label>
+      <input type="text" id="validador" placeholder="Nombre y cargo" value="${esc(S.audit.validador)}">`}
+      <button class="btn primary block" data-action="publish" id="pub-btn" ${published||S.audit.validador.trim()?'':'disabled'}>${published?'Ir a terreno':`Validar y publicar (${sel.length} requisitos)`}</button>
+    </div>
+  </div>`;
+}
+function addFormHTML(temas){
+  const fuentes = [...S.docs, ...S.extras, ...S.perts.filter(p=>p.cargada)];
+  const frecs = ['Diaria','Semanal','Mensual','Trimestral','Semestral','Anual','Por evento','Verificación única'];
+  return `<div class="card stack" id="add-form">
+    <h3>Nuevo requisito</h3>
+    <div class="small muted" style="margin-top:-6px">Quedará marcado como agregado manualmente, con tu nombre en la trazabilidad.</div>
+    <label class="small"><b>Temática *</b><input type="text" id="add-tema" list="temas-list" placeholder="Elige o escribe una nueva"></label>
+    <datalist id="temas-list">${temas.map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
+    <label class="small"><b>Requisito *</b><input type="text" id="add-titulo" placeholder="Ej: Registro de calibración del caudalímetro"></label>
+    <label class="small"><b>Descripción</b><textarea id="add-detalle" placeholder="Qué exige y cómo se verifica"></textarea></label>
+    <label class="small"><b>Fuente</b><select id="add-doc">${fuentes.map(d=>`<option value="${d.id}">${esc((d.tipo?d.tipo+' ':'')+d.numero)}</option>`).join('')}<option value="MANUAL">Criterio del responsable (sin documento)</option></select></label>
+    <label class="small"><b>Referencia</b><input type="text" id="add-ref" placeholder="Ej: Considerando 4.3.2, Tabla 3"></label>
+    <div class="row" style="align-items:flex-start">
+      <label class="small grow"><b>Frecuencia</b><select id="add-frec">${frecs.map(f=>`<option>${f}</option>`).join('')}</select></label>
+      <label class="small grow"><b>Vencimiento</b><input type="date" id="add-venc"></label>
+    </div>
+    <label class="small"><b>Evidencia esperada</b><input type="text" id="add-ev" placeholder="Ej: Foto del equipo y certificado"></label>
+    <div class="row"><button class="btn" data-action="add-cancel">Cancelar</button><button class="btn primary grow" data-action="add-save">Agregar requisito</button></div>
+  </div>`;
+}
+function reqValHTML(r){
+  const d = docById(r.fuente.doc);
+  if(S.editing===r.id){
+    return `<div class="req stack"><input type="text" id="ed-t" value="${esc(r.titulo)}"><textarea id="ed-d">${esc(r.detalle)}</textarea>
+      <div class="row"><button class="btn sm" data-action="edit-cancel">Cancelar</button><button class="btn sm primary" data-action="edit-save" data-id="${r.id}">Guardar</button></div></div>`;
+  }
+  return `<div class="req ${r.val==='descartado'?'off':''}">
+    <div class="row" style="align-items:flex-start">
+      <div class="grow"><div class="t">${esc(r.titulo)}</div><div class="small" style="margin-top:2px">${esc(r.detalle)}</div>
+      <div class="src" style="margin-top:6px">${esc(d.tipo)} ${esc(d.numero)} · ${esc(r.fuente.ref)} · ${esc(r.frecuencia)}</div>
+      ${r.rectificado?`<div style="margin-top:6px"><span class="tag warn">Actualizado por rectificación</span></div>`:''}
+      ${r.editado?`<div style="margin-top:6px"><span class="tag info">Editado por responsable</span></div>`:''}
+      ${r.manual?`<div style="margin-top:6px"><span class="tag ok">Agregado manualmente</span></div>`:''}</div>
+    </div>
+    <div class="row" style="margin-top:8px;gap:6px">
+      ${r.val==='descartado'?`<button class="btn sm" data-action="restore" data-id="${r.id}">Restaurar</button>`:`<button class="btn sm" data-action="edit" data-id="${r.id}">Editar</button><button class="btn sm" data-action="discard" data-id="${r.id}">Descartar</button>`}
+    </div></div>`;
+}
+
+/* ---------- Terreno ---------- */
+function viewTerreno(){
+  if(S.audit.status!=='publicada'){
+    return `<div class="empty card"><h3>No hay auditoría publicada</h3><p class="small">Primero prepara la auditoría: carga los documentos, genera los requisitos y valídalos.</p>
+      <a class="btn primary" href="#/preparar">Preparar auditoría</a><div style="margin-top:10px"><button class="btn ghost sm" data-action="demo">o cargar ejemplo</button></div></div>`;
+  }
+  const st = stats(activeReqs());
+  return `<div class="stack">
+    <div><h2>Trabajo en terreno</h2><div class="small muted">Piscicultura Aucha · ${esc(S.audit.nombre)}</div></div>
+    <div class="card">${progressBar(st)}<div class="row small" style="margin-top:8px"><span class="grow muted">${st.llenos}/${st.total} llenados</span><span><b>${st.pct==null?'—':st.pct+'%'}</b> cumplimiento</span></div>
+      <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple ${st.cumple}</span><span><i style="background:var(--warn)"></i>Parcial ${st.parcial}</span><span><i style="background:var(--bad)"></i>No cumple ${st.no_cumple}</span><span><i style="background:var(--na)"></i>N/A ${st.na}</span></div></div>
+    <input type="search" id="q" placeholder="Buscar requisito, tema o documento…" value="${esc(S.q)}" aria-label="Buscador">
+    <div class="tabs"><button class="${S.tab==='pend'?'on':''}" data-action="tab" data-t="pend">Pendientes · ${st.pendiente}</button><button class="${S.tab==='done'?'on':''}" data-action="tab" data-t="done">Llenados · ${st.llenos}</button></div>
+    <div id="list">${listHTML()}</div>
+    <button class="btn block" data-action="add-from-field">+ Agregar requisito encontrado en terreno</button>
+  </div>`;
+}
+function listHTML(){
+  const q = S.q.trim().toLowerCase();
+  let list = activeReqs().filter(r => S.tab==='pend' ? r.estado==='pendiente' : r.estado!=='pendiente');
+  if(q) list = list.filter(r => (r.titulo+' '+r.tema+' '+r.detalle+' '+docById(r.fuente.doc).numero).toLowerCase().includes(q));
+  if(!list.length) return `<div class="empty">${S.tab==='pend'?'No hay requisitos pendientes. ¡Buen trabajo!':'Aún no hay requisitos llenados.'}</div>`;
+  const temas = [...new Set(list.map(r=>r.tema))];
+  return temas.map(t=>{
+    const items = list.filter(r=>r.tema===t);
+    return `<details class="group" open><summary>${esc(t)}<span class="cnt small muted">${items.length}</span></summary>
+      ${items.map(r=>`<a class="item" href="#/req/${r.id}" style="text-decoration:none"><span class="dot ${r.estado}"></span>
+        <span class="grow"><span class="t">${esc(r.titulo)}</span><br><span class="src">${esc(r.frecuencia)} · ${esc(docById(r.fuente.doc).tipo)}${r.evidencias.length?` · ${r.evidencias.length} evidencia${r.evidencias.length>1?'s':''}`:''}</span>
+        ${r.venc&&r.estado==='pendiente'?`<br>${dueTag(r.venc)}`:''}</span><span class="chev">${icon('chev',18)}</span></a>`).join('')}
+    </details>`;
+  }).join('');
+}
+
+/* ---------- Detalle de requisito ---------- */
+function viewReq(id){
+  const r = S.reqs.find(x=>x.id===id);
+  if(!r) return `<div class="empty">Requisito no encontrado.</div>`;
+  const d = docById(r.fuente.doc);
+  return `<div class="stack">
+    <a href="#/terreno" class="btn ghost" style="padding-left:0">${icon('back',18)} Volver al checklist</a>
+    <div><span class="tag">${esc(r.tema)}</span><h2 style="margin-top:6px">${esc(r.titulo)}</h2><p style="margin:4px 0 0">${esc(r.detalle)}</p></div>
+    ${r.rectificado?`<div class="alert warn"><div><b>Actualizado por rectificación</b>${esc(r.rectificado)}</div></div>`:''}
+    <div class="sec-title">¿Cumple?</div>
+    <div class="status-grid">${['cumple','parcial','no_cumple','na'].map(k=>`<button class="st ${k} ${r.estado===k?'on':''}" data-action="set-estado" data-id="${r.id}" data-k="${k}"><span class="dot ${k}"></span>${ESTADOS[k]}</button>`).join('')}</div>
+    <label class="sec-title" for="obs" style="display:block">Observación</label>
+    <textarea id="obs" data-id="${r.id}" placeholder="Describe lo observado en terreno…">${esc(r.obs||'')}</textarea>
+    <div class="sec-title">Evidencias</div>
+    <div class="small muted" style="margin:-4px 2px 8px">Esperada: ${esc(r.evidencia)}</div>
+    <div class="stack">${r.evidencias.map((e,i)=>`<div class="ev">${e.thumb?`<img src="${e.thumb}" alt="">`:`<span class="ph">${esc((e.nombre.split('.').pop()||'DOC').toUpperCase().slice(0,4))}</span>`}
+      <div class="grow small"><b>${esc(e.nombre)}</b><br><span class="muted">${fmtDate(e.fecha)} · ${e.sync?'sincronizada':'guardada en el teléfono'}</span></div>
+      <button class="btn ghost sm" data-action="ev-del" data-id="${r.id}" data-i="${i}" aria-label="Quitar">${icon('x',16)}</button></div>`).join('') || '<div class="small muted">Sin evidencias aún.</div>'}</div>
+    <div class="row"><button class="btn grow" data-action="ev-photo" data-id="${r.id}">${icon('cam',18)} Tomar foto</button><button class="btn grow" data-action="ev-file" data-id="${r.id}">${icon('clip',18)} Adjuntar</button></div>
+    <div class="sec-title">Información del requisito</div>
+    <div class="card"><dl class="kv">
+      <dt>Fuente</dt><dd>${esc(d.tipo)} ${esc(d.numero)}</dd>
+      <dt>Referencia</dt><dd>${esc(r.fuente.ref)}</dd>
+      <dt>Frecuencia</dt><dd>${esc(r.frecuencia)}</dd>
+      <dt>Vencimiento</dt><dd>${r.venc?`${fmtDate(r.venc)} ${dueTag(r.venc)}`:'—'}</dd>
+      <dt>Validado por</dt><dd>${esc(S.audit.validador||'—')}</dd>
+    </dl></div>
+    <div class="sec-title">Trazabilidad</div>
+    <div class="hist">${r.hist.slice().reverse().map(h=>`<div><b>${esc(h.a)}</b><br><span class="muted xs">${new Date(h.f).toLocaleString('es-CL')} · ${esc(h.q)}</span></div>`).join('')}</div>
+  </div>`;
+}
+
+/* ---------- Panel ---------- */
+function ring(pct, color){
+  const p = pct==null?0:pct, c=2*Math.PI*26;
+  return `<svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="var(--surface-2)" stroke-width="8"/>
+    <circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c*p/100} ${c}" transform="rotate(-90 32 32)"/>
+    <text x="32" y="37" text-anchor="middle" font-size="15" font-weight="700" fill="var(--text)">${pct==null?'—':pct+'%'}</text></svg>`;
+}
+const pctColor = p => p==null?'var(--na)':p>=85?'var(--ok)':p>=65?'var(--warn)':'var(--bad)';
+function viewPanel(){
+  const list = activeReqs(), st = stats(list);
+  const insts = INSTALACIONES.map(i=> i.id==='aucha' ? {...i, pct:st.pct, avance:st.avance, nc:st.no_cumple, total:st.total} : {...i, ...i.demo});
+  const temas = [...new Set(list.map(r=>r.tema))].map(t=>({t, s:stats(list.filter(r=>r.tema===t))}));
+  const venc = list.filter(r=>r.venc && r.estado!=='cumple').sort((a,b)=>a.venc.localeCompare(b.venc)).slice(0,6);
+  const hall = list.filter(r=>r.estado==='no_cumple'||r.estado==='parcial');
+  return `<div class="stack">
+    <div><h2>Panel de cumplimiento</h2><div class="small muted">Visibilidad por instalación para gerencias</div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="v" style="color:${pctColor(st.pct)}">${st.pct==null?'—':st.pct+'%'}</div><div class="l">Cumplimiento Aucha</div></div>
+      <div class="kpi"><div class="v">${st.avance}%</div><div class="l">Avance de auditoría</div></div>
+      <div class="kpi"><div class="v" style="color:var(--bad)">${st.no_cumple}</div><div class="l">No cumple</div></div>
+      <div class="kpi"><div class="v">${list.reduce((n,r)=>n+r.evidencias.length,0)}</div><div class="l">Evidencias cargadas</div></div>
+    </div>
+    <div class="sec-title">Instalaciones</div>
+    <div class="inst">${insts.map(i=>`<div class="card row">${ring(i.pct, pctColor(i.pct))}<div class="grow"><b>${esc(i.nombre)}</b><div class="xs muted">${esc(i.tipo)}${i.real?'':' · ficticio'}</div>
+      <div class="xs" style="margin-top:4px">Avance ${i.avance}% · ${i.nc} no cumple · ${i.total} req.</div></div></div>`).join('')}</div>
+    ${list.length?`
+    <div class="sec-title">Cumplimiento por temática · Aucha</div>
+    <div class="card">${temas.map(({t,s})=>`<div class="bar-row"><span>${esc(t)}</span>${progressBar(s)}<span class="small" style="text-align:right">${s.pct==null?'—':s.pct+'%'}</span></div>`).join('')}
+      <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple</span><span><i style="background:var(--warn)"></i>Parcial</span><span><i style="background:var(--bad)"></i>No cumple</span><span><i style="background:var(--na)"></i>N/A</span><span><i style="background:var(--surface-2)"></i>Pendiente</span></div></div>
+    <div class="sec-title">Próximos vencimientos</div>
+    <div class="card">${venc.length?venc.map(r=>`<a class="row" href="#/req/${r.id}" style="text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--border)"><span class="dot ${r.estado}"></span><span class="grow small"><b>${esc(r.titulo)}</b><br><span class="muted">${fmtDate(r.venc)} · ${esc(r.tema)}</span></span>${dueTag(r.venc)}</a>`).join(''):'<div class="small muted">Sin vencimientos próximos.</div>'}</div>
+    <div class="sec-title">Hallazgos (no cumple o parcial)</div>
+    <div class="card">${hall.length?hall.map(r=>`<a class="row" href="#/req/${r.id}" style="text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--border)"><span class="dot ${r.estado}"></span><span class="grow small"><b>${esc(r.titulo)}</b><br><span class="muted">${esc(r.obs||'Sin observación')}</span></span></a>`).join(''):'<div class="small muted">Sin hallazgos registrados.</div>'}</div>
+    `:`<div class="empty card">Aún no hay una auditoría publicada para Aucha.</div>`}
+    <div class="sec-title">Alertas de documentos</div>
+    ${ALERTAS.map(alertHTML).join('')}
+  </div>`;
+}
+
+/* ---------- Chat de normativa ---------- */
+const STOP = new Set('el la los las de del y o a en que por para con un una se es al lo como cual cuando cuál cuándo qué que hay debo tengo sobre su sus me mi más'.split(' '));
+function botAnswer(q){
+  const tokens = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/[^a-z0-9ñ]+/).filter(t=>t.length>2 && !STOP.has(t));
+  const pool = S.reqs.length ? S.reqs : REQ_TEMPLATES.map(t=>({...t}));
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const scored = pool.map(r=>{ const hay = norm(r.titulo+' '+r.tema+' '+r.detalle+' '+r.frecuencia); return {r, s:tokens.reduce((n,t)=>n+(hay.includes(t)?(norm(r.titulo).includes(t)?2:1):0),0)}; }).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,2);
+  if(!scored.length) return {text:'No encontré un requisito relacionado en los documentos cargados. Prueba con palabras como “ruido”, “lodos”, “RESPEL”, “playa” o “declaración”.'};
+  const r = scored[0].r, d = docById(r.fuente.doc);
+  let text = `${r.titulo}\n${r.detalle}\nFrecuencia: ${r.frecuencia}. Evidencia esperada: ${r.evidencia}.`;
+  if(r.venc) text += `\nPróximo vencimiento: ${fmtDate(r.venc)}.`;
+  if(scored[1]) text += `\n\nTambién relacionado: ${scored[1].r.titulo}.`;
+  return {text, src:`Fuente: ${d.tipo} ${d.numero} · ${r.fuente.ref}`};
+}
+function chatHTML(){
+  const sugs = ['¿Cada cuánto se retiran los lodos?','¿Cuándo vence la declaración SUSPEL?','¿Qué pide la RCA sobre ruido?','¿Cuánto tiempo puede estar un RESPEL en bodega?'];
+  return `<div class="sheet-bg" data-action="chat-close-bg"><div class="sheet" role="dialog" aria-label="Chat de normativa">
+    <header><div class="grow"><b>Consulta la normativa</b><div class="xs muted">Respuestas basadas en los documentos de la instalación · demo</div></div><button class="btn ghost sm" data-action="chat-close" aria-label="Cerrar">${icon('x',18)}</button></header>
+    <div class="msgs" id="msgs">${S.chat.length?'':`<div class="msg bot">Hola. Pregúntame qué exige la RCA o las resoluciones para esta instalación. Siempre te indico la fuente.</div>`}
+      ${S.chat.map(m=>`<div class="msg ${m.me?'me':'bot'}">${esc(m.text)}${m.src?`<div class="src">${esc(m.src)}</div>`:''}</div>`).join('')}</div>
+    <div class="sugs">${sugs.map(s=>`<button class="chip" data-action="chat-sug" data-q="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+    <form class="chat-in" id="chat-form"><input type="text" id="chat-q" placeholder="Escribe tu pregunta…" autocomplete="off"><button class="btn primary" aria-label="Enviar">${icon('send',18)}</button></form>
+  </div></div>`;
+}
+function openChat(){ $('#overlay').innerHTML = chatHTML(); const m=$('#msgs'); m.scrollTop=m.scrollHeight; setTimeout(()=>$('#chat-q')?.focus(),50); }
+function ask(q){ if(!q.trim()) return; S.chat.push({me:true,text:q}); S.chat.push({me:false,...botAnswer(q)}); save(); openChat(); }
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+function render(){
+  const [r, id] = route();
+  renderNav();
+  const inst = INSTALACIONES.find(i=>i.id===S.inst);
+  $('#hdr-sub').textContent = inst ? inst.nombre : '';
+  const views = { inicio:viewInicio, preparar:viewPreparar, terreno:viewTerreno, panel:viewPanel, req:()=>viewReq(id) };
+  $('#view').innerHTML = (views[r]||viewInicio)();
+  $('#fab').classList.toggle('hide', !(r==='terreno'||r==='req'||r==='preparar') || (r==='preparar' && S.adding));
+  updateNet();
+}
+function rerenderList(){ const l=$('#list'); if(l) l.innerHTML = listHTML(); }
+
+/* =========================================================================
+   ACCIONES
+   ========================================================================= */
+function addHist(r, a){ r.hist.push({f:nowISO(), a, q: S.audit.validador || 'Usuario de terreno'}); }
+
+function generate(){
+  const btn = $('#gen-btn'); if(btn) btn.disabled = true;
+  const lines = [
+    `Leyendo ${docById('D1').numero} (141 páginas)…`,
+    'Aplicando rectificación del 19-12-2024 (33 considerandos)…',
+    `Leyendo ${docById('D3').numero} y ${docById('D4').numero}…`,
+    'Identificando obligaciones, frecuencias y evidencias…',
+    'Cruzando documentos: 1 inconsistencia encontrada (superficie RESPEL)',
+    `${REQ_TEMPLATES.length} requisitos propuestos en ${new Set(REQ_TEMPLATES.map(r=>r.tema)).size} temáticas ✓`,
+  ];
+  const log = $('#log'); log.innerHTML='';
+  lines.forEach((l,i)=>setTimeout(()=>{
+    log.insertAdjacentHTML('beforeend', `<div>› ${esc(l)}</div>`);
+    if(i===lines.length-1) setTimeout(()=>{
+      S.reqs = REQ_TEMPLATES.map(t=>({...t, val:'propuesto', estado:'pendiente', obs:'', evidencias:[], hist:[{f:nowISO(), a:'Requisito generado desde '+docById(t.fuente.doc).numero, q:'Sistema'}]}));
+      S.audit.status='en_validacion'; save(); render();
+    }, 600);
+  }, 450*(i+1)));
+}
+
+function publish(){
+  if(S.audit.status==='publicada'){ location.hash='#/terreno'; return; }
+  const name = $('#validador').value.trim(); if(!name) return;
+  S.audit.validador = name;
+  S.reqs.forEach(r=>{
+    if(r.val==='descartado') return;
+    if(S.temasOff.includes(r.tema)){ r.val='fuera'; return; }
+    r.val='validado'; r.hist.push({f:nowISO(), a:'Validado para la auditoría', q:name});
+  });
+  S.audit.status='publicada'; S.audit.publicada=nowISO(); save(true);
+  toast('Auditoría publicada. Ya está disponible en terreno.');
+  location.hash='#/terreno';
+}
+
+function demo(){
+  S = freshState();
+  S.perts.forEach(p=>p.cargada=true);
+  S.audit.validador='Encargada de Cumplimiento Normativo';
+  S.reqs = REQ_TEMPLATES.map(t=>({...t, val:'validado', estado:'pendiente', obs:'', evidencias:[], hist:[
+    {f:'2026-10-14T10:00:00Z', a:'Requisito generado desde '+DOCS_AUCHA.find(d=>d.id===t.fuente.doc).numero, q:'Sistema'},
+    {f:'2026-10-15T15:30:00Z', a:'Validado para la auditoría', q:'Encargada de Cumplimiento Normativo'}]}));
+  const set = {R01:'cumple',R02:'parcial',R03:'cumple',R05:'cumple',R06:'cumple',R09:'cumple',R10:'cumple',R11:'cumple',R12:'no_cumple',R13:'cumple',R16:'cumple',R20:'parcial',R21:'cumple',R27:'cumple',R28:'no_cumple',R30:'cumple',R35:'na'};
+  const obs = {R02:'Grupos de 635 y 750 kVA con silenciador nuevo; falta el de 50 kVA en L2.', R12:'Faltan registros de pH de 3 días de la semana pasada.', R20:'Limpieza realizada, pero falta la guía de despacho de septiembre.', R28:'Envases de aerosol con fecha de ingreso de marzo 2026 (más de 6 meses).'};
+  S.reqs.forEach(r=>{ if(set[r.id]){ r.estado=set[r.id]; r.obs=obs[r.id]||''; r.evidencias=[{nombre:`evidencia_${r.id.toLowerCase()}.jpg`, fecha:'2026-10-19', sync:true}]; r.hist.push({f:'2026-10-19T12:00:00Z', a:`Marcado como “${ESTADOS[r.estado]}” con 1 evidencia`, q:'Jefe de piscicultura'}); }});
+  S.audit.status='publicada'; S.audit.publicada='2026-10-15'; S.step=4;
+  save(); toast('Auditoría de ejemplo cargada'); location.hash='#/terreno'; render();
+}
+
+function resizeImage(file){
+  return new Promise(res=>{
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = ()=>{ const k = Math.min(1, 480/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=img.width*k; c.height=img.height*k; c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg',.6)); };
+    img.onerror = ()=>res(null); img.src = url;
+  });
+}
+let evTarget = null;
+async function onEvidence(file){
+  const r = S.reqs.find(x=>x.id===evTarget); if(!r||!file) return;
+  const thumb = file.type.startsWith('image/') ? await resizeImage(file) : null;
+  r.evidencias.push({nombre:file.name||'foto.jpg', fecha:new Date().toISOString().slice(0,10), thumb, sync:false});
+  addHist(r, `Evidencia agregada: ${file.name||'foto'}`);
+  save(true); render();
+}
+
+document.addEventListener('click', e=>{
+  const el = e.target.closest('[data-action]'); if(!el) return;
+  const a = el.dataset.action, id = el.dataset.id;
+  const req = id && S.reqs.find(r=>r.id===id);
+  switch(a){
+    case 'pick-inst': S.inst=id; save(); render(); break;
+    case 'step': S.step=+el.dataset.n; save(); render(); window.scrollTo(0,0); break;
+    case 'pert-load': { const p=S.perts.find(x=>x.id===id); p.cargada=true; save(); render(); toast('Pertinencia cargada'); break; }
+    case 'generate': generate(); break;
+    case 'toggle-tema': { const t=el.dataset.t; S.temasOff = S.temasOff.includes(t) ? S.temasOff.filter(x=>x!==t) : [...S.temasOff, t]; save(); render(); break; }
+    case 'edit': S.editing=id; render(); break;
+    case 'edit-cancel': S.editing=null; render(); break;
+    case 'edit-save': req.titulo=$('#ed-t').value.trim()||req.titulo; req.detalle=$('#ed-d').value.trim()||req.detalle; req.editado=true; req.hist.push({f:nowISO(),a:'Editado por el responsable',q:S.audit.validador||'Responsable'}); S.editing=null; save(); render(); break;
+    case 'discard': req.val='descartado'; req.hist.push({f:nowISO(),a:'Descartado por el responsable',q:S.audit.validador||'Responsable'}); save(); render(); break;
+    case 'restore': req.val= S.audit.status==='publicada'?'validado':'propuesto'; save(); render(); break;
+    case 'add-open': S.adding=true; render(); setTimeout(()=>{ $('#add-form')?.scrollIntoView({behavior:'smooth',block:'start'}); $('#add-tema')?.focus(); },50); break;
+    case 'add-from-field': S.step=4; S.adding=true; save(); location.hash='#/preparar'; setTimeout(()=>{ $('#add-form')?.scrollIntoView({block:'start'}); $('#add-tema')?.focus(); },80); break;
+    case 'add-cancel': S.adding=false; render(); break;
+    case 'add-save': {
+      const tema=$('#add-tema').value.trim(), titulo=$('#add-titulo').value.trim();
+      if(!tema||!titulo){ toast('Completa la temática y el requisito'); break; }
+      const venc=$('#add-venc').value.trim(), pub=S.audit.status==='publicada', quien=S.audit.validador||'Responsable';
+      const n = S.reqs.filter(r=>r.manual).length+1;
+      const r = { id:'M'+String(n).padStart(2,'0')+'-'+Date.now().toString(36).slice(-3), manual:true, tema, titulo,
+        detalle:$('#add-detalle').value.trim()||'Requisito agregado por el responsable.',
+        fuente:{doc:$('#add-doc').value, ref:$('#add-ref').value.trim()||'—'}, frecuencia:$('#add-frec').value,
+        evidencia:$('#add-ev').value.trim()||'Por definir', venc:/^\d{4}-\d{2}-\d{2}$/.test(venc)?venc:undefined,
+        val:pub?'validado':'propuesto', estado:'pendiente', obs:'', evidencias:[],
+        hist:[{f:nowISO(), a:'Agregado manualmente (no detectado por el análisis)', q:quien}] };
+      if(pub) r.hist.push({f:nowISO(), a:'Validado para la auditoría', q:quien});
+      S.temasOff = S.temasOff.filter(t=>t!==tema);
+      S.reqs.push(r); S.adding=false; save(pub);
+      if(pub){ toast('Requisito agregado a la auditoría en terreno'); location.hash='#/req/'+r.id; }
+      else { render(); toast('Requisito agregado'); }
+      break;
+    }
+    case 'publish': publish(); break;
+    case 'tab': S.tab=el.dataset.t; save(); render(); break;
+    case 'set-estado': { const k=el.dataset.k; req.estado = req.estado===k ? 'pendiente' : k; addHist(req, req.estado==='pendiente'?'Estado borrado':`Marcado como “${ESTADOS[k]}”`); save(true); render(); toast(req.estado==='pendiente'?'Estado borrado':`Guardado: ${ESTADOS[k]}`); break; }
+    case 'ev-photo': evTarget=id; $('#file-photo').click(); break;
+    case 'ev-file': evTarget=id; $('#file-any').click(); break;
+    case 'ev-del': { req.evidencias.splice(+el.dataset.i,1); addHist(req,'Evidencia eliminada'); save(true); render(); break; }
+    case 'theme': toggleTheme(); break;
+    case 'demo': demo(); break;
+    case 'reset': if(confirm('¿Borrar los datos del prototipo en este dispositivo?')){ S=freshState(); save(); location.hash='#/inicio'; render(); } break;
+    case 'chat-open': openChat(); break;
+    case 'chat-close': $('#overlay').innerHTML=''; break;
+    case 'chat-close-bg': if(e.target===el) $('#overlay').innerHTML=''; break;
+    case 'chat-sug': ask(el.dataset.q); break;
+  }
+});
+document.addEventListener('input', e=>{
+  if(e.target.id==='q'){ S.q=e.target.value; rerenderList(); }
+  if(e.target.id==='validador'){ S.audit.validador=e.target.value; const b=$('#pub-btn'); if(b) b.disabled=!e.target.value.trim(); }
+});
+document.addEventListener('change', e=>{
+  if(e.target.id==='obs'){ const r=S.reqs.find(x=>x.id===e.target.dataset.id); r.obs=e.target.value; addHist(r,'Observación actualizada'); save(true); }
+  if(e.target.id==='validador') save();
+  if(e.target.id==='file-doc' && e.target.files[0]){ const f=e.target.files[0]; S.extras.push({id:'X'+Date.now(), tipo:'Documento', numero:f.name, titulo:'Cargado por el usuario · se procesará al generar', vigencia:'Por verificar', estado:'info'}); save(); render(); toast('Documento cargado'); }
+  if(e.target.id==='file-pert' && e.target.files[0]){ const f=e.target.files[0]; S.perts.push({id:'P'+Date.now(), numero:f.name, titulo:'Pertinencia cargada por el usuario', cargada:true}); save(); render(); }
+  if((e.target.id==='file-photo'||e.target.id==='file-any') && e.target.files[0]) onEvidence(e.target.files[0]);
+  e.target.value && e.target.type==='file' && (e.target.value='');
+});
+document.addEventListener('submit', e=>{ if(e.target.id==='chat-form'){ e.preventDefault(); ask($('#chat-q').value); } });
+
+/* ---------- Conectividad: guarda local y sincroniza al volver la señal ---------- */
+let syncTimer=null;
+function scheduleSync(){ updateNet(); if(!navigator.onLine) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>{ S.reqs.forEach(r=>r.evidencias.forEach(ev=>ev.sync=true)); S.pending=0; try{localStorage.setItem(KEY, JSON.stringify(S));}catch(e){} updateNet(); }, 1500); }
+function updateNet(){
+  const n=$('#net'); if(!n) return;
+  if(!navigator.onLine){ n.className='net off'; n.textContent = `Sin conexión${S.pending?` · ${S.pending} por sincronizar`:''}`; }
+  else { n.className='net'; n.textContent = S.pending ? `Sincronizando ${S.pending}…` : 'En línea'; }
+}
+window.addEventListener('online', ()=>{ scheduleSync(); toast('Conexión recuperada: sincronizando'); });
+window.addEventListener('offline', ()=>{ updateNet(); toast('Sin conexión: los cambios se guardan en el teléfono'); });
+window.addEventListener('hashchange', ()=>{ render(); window.scrollTo(0,0); });
+
+applyTheme(getTheme()); load(); render(); if(S.pending) scheduleSync();
+</script>
+</body>
+</html>

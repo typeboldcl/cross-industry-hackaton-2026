@@ -5,6 +5,7 @@ pnpm workspace: apps live in `apps/`, shared code in `packages/`.
 | Path                 | Package               | What                             |
 | -------------------- | --------------------- | -------------------------------- |
 | `apps/backend`       | `hackaton-backend`    | NestJS API, served under `/api`  |
+| `apps/frontend`      | —                     | Static HTML prototype (no build) |
 | `packages/contracts` | `@hackaton/contracts` | HTTP contract types (types only) |
 
 ## Requirements

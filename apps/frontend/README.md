@@ -20,11 +20,13 @@ Centro (installation) → Auditorías (several per centro, in progress and close
 - **Auditorías del centro**: "+ Crear nueva auditoría", audits in progress and closed, the centro's documents and the alerts found across them.
 - **Crear nueva auditoría**: type, name and date; the centro comes locked from the previous screen.
 - **Preparar** (before visiting the site): audit details, load the RCA and sectoral resolutions, load pertinencias, generate requirements, then have a responsible person validate them (pick themes, edit, discard or add requirements the analysis missed) and publish.
-- **Terreno**: search, Pendientes / Llenados tabs, requirements grouped by theme, traffic-light status (Cumple / Parcial / No cumple / No aplica), notes, photo and file evidence, and a per-requirement change history. Works offline. Closed audits are read-only.
+- **Terreno**: search, Todos / Llenados / Pendientes tabs, requirements grouped by theme with pending ones first, status (Cumple / No cumple / No aplica, matching Invermar's current SÍ / NO / N/A sheet) set straight from each pending row (marked ones turn into a coloured card and are edited from the detail), notes, photo and file evidence, and a per-requirement change history. No cumple requires a note (evidence is optional), No aplica requires a reason, a whole theme can be marked No aplica, and every change can be undone for a few seconds. Works offline. Closed audits are read-only.
 - **Panel**: compliance per theme, upcoming due dates, findings, the centro's audit history, and "Cerrar auditoría".
 - **Chat**: answers questions about the installation's requirements and always cites the source document.
 
 Audit states: `sin_preparar` (Borrador) → `en_validacion` → `publicada` (En terreno) → `cerrada`.
+
+The navigation bar (Auditorías · Terreno · Panel) only shows once an audit is open. Preparar is reached from the audit card, not from the bar.
 
 ### What is mocked
 

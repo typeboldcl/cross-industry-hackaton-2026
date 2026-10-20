@@ -35,7 +35,10 @@ body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-syst
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:var(--primary)}
-.app{min-height:100vh;padding-bottom:84px}
+.app{min-height:100vh;padding-bottom:24px}
+body.has-nav .app{padding-bottom:84px}
+body:not(.has-nav) .nav{display:none}
+body:not(.has-nav) .sticky-foot{bottom:12px}
 /* Header */
 .topbar{position:sticky;top:0;z-index:20;background:var(--primary);color:var(--primary-ink);padding:10px 16px;display:flex;align-items:center;gap:10px}
 .topbar h1{font-size:16px;margin:0;font-weight:650;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -52,7 +55,8 @@ a{color:var(--primary)}
 .nav a.on{color:var(--primary);font-weight:650}
 .nav svg{width:22px;height:22px}
 @media (min-width:1000px){
-  .app{padding-bottom:0;padding-left:220px}
+  .app{padding-bottom:0}
+  body.has-nav .app{padding-bottom:0;padding-left:220px}
   .nav{top:56px;bottom:0;right:auto;width:220px;flex-direction:column;border-top:0;border-right:1px solid var(--border);padding:12px}
   .nav a{flex:0;flex-direction:row;gap:10px;font-size:14px;padding:10px 12px;justify-content:flex-start}
   .nav a.on{background:var(--primary-soft)}
@@ -89,7 +93,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--primary);box-shadow:0
 textarea{min-height:80px;resize:vertical}
 .dot{width:12px;height:12px;border-radius:50%;flex:none;background:var(--na-soft);border:2px solid var(--na)}
 .dot.cumple{background:var(--ok);border-color:var(--ok)}
-.dot.parcial{background:var(--warn);border-color:var(--warn)}
 .dot.no_cumple{background:var(--bad);border-color:var(--bad)}
 .dot.na{background:var(--na);border-color:var(--na)}
 .progress{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;display:flex}
@@ -144,16 +147,40 @@ textarea{min-height:80px;resize:vertical}
 .item+.item{margin-top:8px}
 .item .t{font-weight:600;font-size:14.5px}
 .chev{color:var(--muted);flex:none}
+/* Fila de terreno con estado rápido (sin abrir el requisito) */
+.item.q{flex-direction:column;align-items:stretch;gap:10px}
+.q-top{display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--text)}
+.q-btns{display:grid;grid-template-columns:1fr 1fr .7fr;gap:6px}
+.q-btns button{border:1.5px solid var(--border);background:var(--surface);border-radius:10px;min-height:38px;padding:4px 8px;font-size:12.5px;font-weight:650;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.q-btns button .dot{width:10px;height:10px}
+.q-btns button.on.cumple{border-color:var(--ok);background:var(--ok-soft)}
+.q-btns button.on.no_cumple{border-color:var(--bad);background:var(--bad-soft)}
+.q-btns button.on.na{border-color:var(--na);background:var(--na-soft)}
+.q-btns button:disabled{opacity:.55;cursor:default}
+.item.done{text-decoration:none;border-width:2px}
+.item.done .src{display:block;margin-top:2px}
+.item.done .d-note{display:block;font-size:13px;margin-top:4px;color:var(--text)}
+.item.done .st-lbl{font-size:12px;font-weight:700;white-space:nowrap}
+.item.done.cumple{border-color:var(--ok);background:var(--ok-soft)}
+.item.done.no_cumple{border-color:var(--bad);background:var(--bad-soft)}
+.item.done.na{border-color:var(--na);background:var(--na-soft)}
+.na-pick{background:var(--surface-2);border-radius:10px;padding:10px}
+.na-pick .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.na-pick .chips button{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13px}
+.na-pick .chips button.on{border-color:var(--na);background:var(--na-soft);font-weight:650}
+.tema-na{margin-left:auto;border:1px solid var(--border);background:transparent;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;color:var(--muted)}
+.group>summary .tema-na+.cnt{margin-left:0}
+textarea.need{border-color:var(--bad)!important;box-shadow:0 0 0 3px var(--bad-soft)}
+.toast{display:flex;align-items:center}
+.toast .undo{margin-left:14px;border:0;background:transparent;color:inherit;font-weight:700;text-decoration:underline;padding:4px 0;white-space:nowrap}
 .fab{position:fixed;right:16px;bottom:96px;z-index:25;width:58px;height:58px;border-radius:50%;border:0;background:var(--primary);color:var(--primary-ink);box-shadow:0 6px 18px rgba(0,0,0,.25);display:grid;place-items:center}
 .fab svg{width:26px;height:26px}
 @media (min-width:1000px){.fab{bottom:24px;right:24px}}
 /* Detalle */
-.status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-@media (min-width:520px){.status-grid{grid-template-columns:repeat(4,1fr)}}
+.status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .st{border:2px solid var(--border);background:var(--surface);border-radius:14px;padding:14px 8px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:6px}
 .st .dot{width:18px;height:18px}
 .st.on.cumple{border-color:var(--ok);background:var(--ok-soft)}
-.st.on.parcial{border-color:var(--warn);background:var(--warn-soft)}
 .st.on.no_cumple{border-color:var(--bad);background:var(--bad-soft)}
 .st.on.na{border-color:var(--na);background:var(--na-soft)}
 .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:14px}
@@ -301,8 +328,11 @@ const REQ_TEMPLATES = [
    ESTADO (persistido en el teléfono para trabajar sin conexión)
    ========================================================================= */
 const KEY = 'auditorias-proto-v2';
-const ESTADOS = { cumple:'Cumple', parcial:'Parcial', no_cumple:'No cumple', na:'No aplica', pendiente:'Pendiente' };
-const TIPOS_AUDITORIA = ['Interna','Seguimiento de hallazgos','Externa / certificación','Simulacro de fiscalización SMA'];
+// Igual que la planilla actual de Invermar: SÍ / NO / N/A (sin "parcial").
+const ESTADOS = { cumple:'Cumple', no_cumple:'No cumple', na:'No aplica', pendiente:'Pendiente' };
+// "No aplica" siempre lleva motivo: sin él, un N/A no se distingue de un requisito que se saltó.
+const NA_MOTIVOS = ['La actividad no se realiza en el centro','No corresponde a la fase actual del proyecto','Su plazo o frecuencia no cae en este periodo','Otro motivo'];
+const TIPOS_AUDITORIA =['Interna','Seguimiento de hallazgos','Externa / certificación','Simulacro de fiscalización SMA'];
 const STATUS = {
   sin_preparar:{ label:'Borrador', cls:'', accion:'Continuar preparación', ruta:'preparar' },
   en_validacion:{ label:'En validación', cls:'warn', accion:'Validar requisitos', ruta:'preparar' },
@@ -312,7 +342,7 @@ const STATUS = {
 
 // S = estado de la app; cada centro puede tener varias auditorías (S.audits).
 // A = auditoría abierta actualmente (S.cur).
-function freshState(){ return { centro:null, cur:null, audits:[], seq:0, tab:'pend', q:'', pending:0, chat:[], editing:null, adding:false }; }
+function freshState(){ return { centro:null, cur:null, audits:[], seq:0, tab:'todos', q:'', pending:0, chat:[], editing:null, adding:false }; }
 function newAudit({inst, nombre, tipo, fecha}){
   S.seq = (S.seq||0) + 1;
   const real = inst==='aucha';
@@ -322,7 +352,10 @@ function newAudit({inst, nombre, tipo, fecha}){
 }
 let S, A = null;
 function syncA(){ A = (S.audits||[]).find(a=>a.id===S.cur) || null; }
-function load(){ try{ const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : freshState(); }catch(e){ S = freshState(); } if(!Array.isArray(S.audits)) S = freshState(); syncA(); }
+function load(){ try{ const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : freshState(); }catch(e){ S = freshState(); } if(!Array.isArray(S.audits)) S = freshState(); S.naPick=null; S.notePick=null; S.noteDraft=null;
+  // "Parcial" se eliminó: los datos guardados antes pasan a "No cumple" (ya tienen nota).
+  S.audits.forEach(a=>a.reqs.forEach(r=>{ if(r.estado==='parcial') r.estado='no_cumple'; }));
+  syncA(); }
 function save(markPending){ if(markPending){ S.pending++; scheduleSync(); } try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 const instById = id => INSTALACIONES.find(i=>i.id===id);
 const auditsOf = inst => S.audits.filter(a=>a.inst===inst).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
@@ -341,16 +374,24 @@ function docById(id, a=A){
   return src.docs.find(d=>d.id===id) || src.extras.find(d=>d.id===id) || src.perts.find(d=>d.id===id) || {numero:id, tipo:''};
 }
 const activeReqs = (a=A) => a ? a.reqs.filter(r=>r.val==='validado') : [];
-function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+// Con undoFn el toast muestra "Deshacer" y dura más (por si el toque en terreno fue accidental).
+let undoFn = null;
+function toast(msg, undo){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  undoFn = undo || null;
+  if(undo){ const b=document.createElement('button'); b.className='undo'; b.dataset.action='undo'; b.textContent='Deshacer'; t.appendChild(b); }
+  document.body.appendChild(t); setTimeout(()=>{ t.remove(); if(undoFn===undo) undoFn=null; }, undo?5000:2600);
+}
 function dueTag(iso){ if(!iso) return ''; const d=daysTo(iso); const cls = d<0?'bad':d<=14?'warn':'info'; const txt = d<0?`Vencido hace ${-d} d`:d===0?'Vence hoy':`Vence en ${d} d`; return `<span class="tag ${cls}">${txt}</span>`; }
 
 function stats(list){
-  const s={total:list.length,cumple:0,parcial:0,no_cumple:0,na:0,pendiente:0};
+  const s={total:list.length,cumple:0,no_cumple:0,na:0,pendiente:0};
   list.forEach(r=>s[r.estado||'pendiente']++);
-  const evaluados = s.cumple+s.parcial+s.no_cumple;
+  const evaluados = s.cumple+s.no_cumple;
   s.llenos = s.total - s.pendiente;
   s.avance = s.total ? Math.round(s.llenos/s.total*100) : 0;
-  s.pct = evaluados ? Math.round((s.cumple + s.parcial*0.5)/evaluados*100) : null;
+  s.pct = evaluados ? Math.round(s.cumple/evaluados*100) : null;
   return s;
 }
 
@@ -393,8 +434,12 @@ function route(){ return (location.hash.replace(/^#\/?/,'') || 'inicio').split('
 
 function renderNav(){
   const [r] = route();
-  const items = [['inicio','Centros','home'],['preparar','Preparar','prep'],['terreno','Terreno','field'],['panel','Panel','panel']];
-  const on = id => r===id || (id==='terreno' && r==='req') || (id==='inicio' && (r==='centro'||r==='nueva'));
+  // La barra solo aparece dentro de una auditoría: antes no se sabe a cuál se está entrando.
+  const show = !!A && ['preparar','terreno','panel','req'].includes(r);
+  document.body.classList.toggle('has-nav', show);
+  if(!show){ $('#nav').innerHTML=''; return; }
+  const items = [[`centro/${A.inst}`,'Auditorías','home'],['terreno','Terreno','field'],['panel','Panel','panel']];
+  const on = id => r===id || (id==='terreno' && r==='req');
   $('#nav').innerHTML = items.map(([id,l,ic])=>`<a href="#/${id}" class="${on(id)?'on':''}">${icon(ic)}<span>${l}</span></a>`).join('');
 }
 const INST_ICON = {aucha:'fish', ces:'boat', planta:'factory'};
@@ -492,7 +537,7 @@ function alertHTML(a){ return `<div class="alert ${a.tipo}" style="margin-bottom
 function progressBar(st){
   const w = k => st.total ? (st[k]/st.total*100) : 0;
   return `<div class="progress" role="img" aria-label="Avance">
-    <i style="width:${w('cumple')}%;background:var(--ok)"></i><i style="width:${w('parcial')}%;background:var(--warn)"></i><i style="width:${w('no_cumple')}%;background:var(--bad)"></i><i style="width:${w('na')}%;background:var(--na)"></i></div>`;
+    <i style="width:${w('cumple')}%;background:var(--ok)"></i><i style="width:${w('no_cumple')}%;background:var(--bad)"></i><i style="width:${w('na')}%;background:var(--na)"></i></div>`;
 }
 
 /* ---------- Preparar (wizard) ---------- */
@@ -624,27 +669,67 @@ function viewTerreno(){
     <div><h2>Trabajo en terreno</h2><div class="small muted">${esc(instById(A.inst).nombre)} · ${esc(A.nombre)}</div></div>
     ${closed?`<div class="alert info"><div><b>Auditoría cerrada el ${fmtDate(A.cerrada)}</b>Solo lectura: puedes revisar los resultados y evidencias.</div></div>`:''}
     <div class="card">${progressBar(st)}<div class="row small" style="margin-top:8px"><span class="grow muted">${st.llenos}/${st.total} llenados</span><span><b>${st.pct==null?'—':st.pct+'%'}</b> cumplimiento</span></div>
-      <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple ${st.cumple}</span><span><i style="background:var(--warn)"></i>Parcial ${st.parcial}</span><span><i style="background:var(--bad)"></i>No cumple ${st.no_cumple}</span><span><i style="background:var(--na)"></i>N/A ${st.na}</span></div></div>
+      <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple ${st.cumple}</span><span><i style="background:var(--bad)"></i>No cumple ${st.no_cumple}</span><span><i style="background:var(--na)"></i>N/A ${st.na}</span></div></div>
     <input type="search" id="q" placeholder="Buscar requisito, tema o documento…" value="${esc(S.q)}" aria-label="Buscador">
-    <div class="tabs"><button class="${S.tab==='pend'?'on':''}" data-action="tab" data-t="pend">Pendientes · ${st.pendiente}</button><button class="${S.tab==='done'?'on':''}" data-action="tab" data-t="done">Llenados · ${st.llenos}</button></div>
+    <div class="tabs"><button class="${S.tab==='todos'?'on':''}" data-action="tab" data-t="todos">Todos · ${st.total}</button><button class="${S.tab==='done'?'on':''}" data-action="tab" data-t="done">Llenados · ${st.llenos}</button><button class="${S.tab==='pend'?'on':''}" data-action="tab" data-t="pend">Pendientes · ${st.pendiente}</button></div>
     <div id="list">${listHTML()}</div>
     ${closed?'':`<button class="btn block" data-action="add-from-field">+ Agregar requisito encontrado en terreno</button>`}
   </div>`;
 }
 function listHTML(){
   const q = S.q.trim().toLowerCase();
-  let list = activeReqs().filter(r => S.tab==='pend' ? r.estado==='pendiente' : r.estado!=='pendiente');
+  let list = activeReqs().filter(r => S.tab==='pend' ? r.estado==='pendiente' : S.tab==='done' ? r.estado!=='pendiente' : true);
   if(q) list = list.filter(r => (r.titulo+' '+r.tema+' '+r.detalle+' '+docById(r.fuente.doc).numero).toLowerCase().includes(q));
-  if(!list.length) return `<div class="empty">${S.tab==='pend'?'No hay requisitos pendientes. ¡Buen trabajo!':'Aún no hay requisitos llenados.'}</div>`;
+  if(!list.length) return `<div class="empty">${q?'Ningún requisito coincide con la búsqueda.':S.tab==='pend'?'No hay requisitos pendientes. ¡Buen trabajo!':S.tab==='done'?'Aún no hay requisitos llenados.':'No hay requisitos en esta auditoría.'}</div>`;
   const temas = [...new Set(list.map(r=>r.tema))];
+  const ro = A.status==='cerrada';
   return temas.map(t=>{
-    const items = list.filter(r=>r.tema===t);
-    return `<details class="group" open><summary>${esc(t)}<span class="cnt small muted">${items.length}</span></summary>
-      ${items.map(r=>`<a class="item" href="#/req/${r.id}" style="text-decoration:none"><span class="dot ${r.estado}"></span>
-        <span class="grow"><span class="t">${esc(r.titulo)}</span><br><span class="src">${esc(r.frecuencia)} · ${esc(docById(r.fuente.doc).tipo)}${r.evidencias.length?` · ${r.evidencias.length} evidencia${r.evidencias.length>1?'s':''}`:''}</span>
-        ${r.venc&&r.estado==='pendiente'?`<br>${dueTag(r.venc)}`:''}</span><span class="chev">${icon('chev',18)}</span></a>`).join('')}
+    // Dentro de cada temática, los pendientes van primero para que se vean; los ya marcados bajan.
+    const items = list.filter(r=>r.tema===t).sort((a,b)=>(a.estado==='pendiente'?0:1)-(b.estado==='pendiente'?0:1));
+    const pend = items.filter(r=>r.estado==='pendiente').length;
+    const temaNA = S.tab!=='done' && !ro && pend>1 ? `<button class="tema-na" data-action="tema-na" data-t="${esc(t)}">Tema no aplica</button>` : '';
+    const cnt = S.tab==='todos' ? `${items.length-pend}/${items.length}` : items.length;
+    return `<details class="group" open><summary>${esc(t)}${temaNA}<span class="cnt small muted">${cnt}</span></summary>
+      ${items.map(r=>r.estado==='pendiente' ? itemHTML(r, ro) : doneHTML(r)).join('')}
     </details>`;
   }).join('');
+}
+// Requisito ya marcado: recuadro del color de su estado, sin botones. Se corrige abriendo el detalle.
+function doneHTML(r){
+  const n = r.evidencias.length;
+  const nota = r.estado==='na' ? (r.naMotivo?`No aplica: ${r.naMotivo}`:'Falta el motivo de No aplica') : r.obs;
+  return `<a class="item done ${r.estado}" href="#/req/${r.id}">
+    <span class="grow"><span class="row" style="gap:8px;align-items:flex-start"><span class="t grow">${esc(r.titulo)}</span><span class="st-lbl">${ESTADOS[r.estado]}</span></span>
+      <span class="src">${esc(r.frecuencia)} · ${esc(docById(r.fuente.doc).tipo)}${n?` · ${n} evidencia${n>1?'s':''}`:''}</span>
+      ${nota?`<span class="d-note">${esc(nota)}</span>`:''}</span><span class="chev">${icon('chev',18)}</span></a>`;
+}
+function itemHTML(r, ro){
+  const lbl = {cumple:'Cumple', no_cumple:'No cumple', na:'N/A'};
+  const extra = [r.frecuencia, docById(r.fuente.doc).tipo, r.evidencias.length?`${r.evidencias.length} evidencia${r.evidencias.length>1?'s':''}`:'' ].filter(Boolean).join(' · ');
+  return `<div class="item q">
+    <a class="q-top" href="#/req/${r.id}"><span class="dot ${r.estado}"></span>
+      <span class="grow"><span class="t">${esc(r.titulo)}</span><br><span class="src">${esc(extra)}</span>
+      ${r.estado==='na'&&r.naMotivo?`<br><span class="small muted">No aplica: ${esc(r.naMotivo)}</span>`:''}
+      ${r.venc&&r.estado==='pendiente'?`<br>${dueTag(r.venc)}`:''}</span><span class="chev">${icon('chev',18)}</span></a>
+    <div class="q-btns">${['cumple','no_cumple','na'].map(k=>`<button class="${k} ${r.estado===k?'on':''}" data-action="quick-estado" data-id="${r.id}" data-k="${k}" ${ro?'disabled':''} aria-pressed="${r.estado===k}"><span class="dot ${k}"></span>${lbl[k]}</button>`).join('')}</div>
+    ${S.naPick===r.id?naPickHTML(r):''}
+    ${S.notePick&&S.notePick.id===r.id?notePickHTML(r, S.notePick.k):''}
+  </div>`;
+}
+// No cumple exige una nota: un hallazgo sin descripción no sirve en la auditoría. La evidencia es opcional.
+function notePickHTML(r, k){
+  const n = r.evidencias.length;
+  return `<div class="na-pick stack" style="--gap:8px">
+    <div class="row small"><span class="dot ${k}"></span><b class="grow">${ESTADOS[k]}: ¿qué observaste? <span style="color:var(--bad)">*</span></b></div>
+    <textarea id="q-note" data-id="${r.id}" rows="3" placeholder="Describe el hallazgo (obligatorio)…">${esc(S.noteDraft ?? r.obs ?? '')}</textarea>
+    <div class="row wrap small"><button class="btn sm" data-action="ev-photo" data-id="${r.id}">${icon('cam',16)} Foto</button><button class="btn sm" data-action="ev-file" data-id="${r.id}">${icon('clip',16)} Adjuntar</button>
+      <span class="muted grow">${n?`${n} evidencia${n>1?'s':''}`:'Evidencia opcional'}</span></div>
+    <div class="row"><button class="btn sm grow" data-action="note-cancel">Cancelar</button><button class="btn sm primary grow" data-action="note-save" data-id="${r.id}">Guardar ${ESTADOS[k]}</button></div>
+  </div>`;
+}
+function naPickHTML(r){
+  return `<div class="na-pick"><div class="row small"><b class="grow">¿Por qué no aplica?</b><button class="btn ghost sm" data-action="na-cancel">Cancelar</button></div>
+    <div class="chips">${NA_MOTIVOS.map(m=>`<button class="${r.naMotivo===m?'on':''}" data-action="na-motivo" data-id="${r.id}" data-m="${esc(m)}">${esc(m)}</button>`).join('')}</div></div>`;
 }
 
 /* ---------- Detalle de requisito ---------- */
@@ -658,8 +743,10 @@ function viewReq(id){
     <div><span class="tag">${esc(r.tema)}</span><h2 style="margin-top:6px">${esc(r.titulo)}</h2><p style="margin:4px 0 0">${esc(r.detalle)}</p></div>
     ${r.rectificado?`<div class="alert warn"><div><b>Actualizado por rectificación</b>${esc(r.rectificado)}</div></div>`:''}
     <div class="sec-title">¿Cumple?</div>
-    <div class="status-grid">${['cumple','parcial','no_cumple','na'].map(k=>`<button class="st ${k} ${r.estado===k?'on':''}" data-action="set-estado" data-id="${r.id}" data-k="${k}" ${ro}><span class="dot ${k}"></span>${ESTADOS[k]}</button>`).join('')}</div>
-    <label class="sec-title" for="obs" style="display:block">Observación</label>
+    <div class="status-grid">${['cumple','no_cumple','na'].map(k=>`<button class="st ${k} ${r.estado===k?'on':''}" data-action="set-estado" data-id="${r.id}" data-k="${k}" ${ro}><span class="dot ${k}"></span>${ESTADOS[k]}</button>`).join('')}</div>
+    ${r.estado==='na'?`<div class="na-pick"><b class="small">¿Por qué no aplica?</b>${r.naMotivo?'':' <span class="small" style="color:var(--bad)">Falta el motivo</span>'}
+      <div class="chips">${NA_MOTIVOS.map(m=>`<button class="${r.naMotivo===m?'on':''}" data-action="na-motivo" data-id="${r.id}" data-m="${esc(m)}" ${ro}>${esc(m)}</button>`).join('')}</div></div>`:''}
+    <label class="sec-title" for="obs" style="display:block">Observación${r.estado==='no_cumple'||r.naMotivo==='Otro motivo'?' <span style="color:var(--bad)">* obligatoria</span>':''}</label>
     <textarea id="obs" data-id="${r.id}" ${ro} placeholder="Describe lo observado en terreno…">${esc(r.obs||'')}</textarea>
     <div class="sec-title">Evidencias</div>
     <div class="small muted" style="margin:-4px 2px 8px">Esperada: ${esc(r.evidencia)}</div>
@@ -693,7 +780,7 @@ function viewPanel(){
   const list = activeReqs(), st = stats(list), inst = instById(A.inst);
   const temas = [...new Set(list.map(r=>r.tema))].map(t=>({t, s:stats(list.filter(r=>r.tema===t))}));
   const venc = list.filter(r=>r.venc && r.estado!=='cumple').sort((a,b)=>a.venc.localeCompare(b.venc)).slice(0,6);
-  const hall = list.filter(r=>r.estado==='no_cumple'||r.estado==='parcial');
+  const hall = list.filter(r=>r.estado==='no_cumple');
   const historial = auditsOf(A.inst);
   return `<div class="stack">
     ${crumbHTML()}
@@ -713,10 +800,10 @@ function viewPanel(){
     ${list.length?`
     <div class="sec-title">Cumplimiento por temática</div>
     <div class="card">${temas.map(({t,s})=>`<div class="bar-row"><span>${esc(t)}</span>${progressBar(s)}<span class="small" style="text-align:right">${s.pct==null?'—':s.pct+'%'}</span></div>`).join('')}
-      <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple</span><span><i style="background:var(--warn)"></i>Parcial</span><span><i style="background:var(--bad)"></i>No cumple</span><span><i style="background:var(--na)"></i>N/A</span><span><i style="background:var(--surface-2)"></i>Pendiente</span></div></div>
+      <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple</span><span><i style="background:var(--bad)"></i>No cumple</span><span><i style="background:var(--na)"></i>N/A</span><span><i style="background:var(--surface-2)"></i>Pendiente</span></div></div>
     <div class="sec-title">Próximos vencimientos</div>
     <div class="card">${venc.length?venc.map(r=>`<a class="row" href="#/req/${r.id}" style="text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--border)"><span class="dot ${r.estado}"></span><span class="grow small"><b>${esc(r.titulo)}</b><br><span class="muted">${fmtDate(r.venc)} · ${esc(r.tema)}</span></span>${dueTag(r.venc)}</a>`).join(''):'<div class="small muted">Sin vencimientos próximos.</div>'}</div>
-    <div class="sec-title">Hallazgos (no cumple o parcial)</div>
+    <div class="sec-title">Hallazgos (no cumple)</div>
     <div class="card">${hall.length?hall.map(r=>`<a class="row" href="#/req/${r.id}" style="text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--border)"><span class="dot ${r.estado}"></span><span class="grow small"><b>${esc(r.titulo)}</b><br><span class="muted">${esc(r.obs||'Sin observación')}</span></span></a>`).join(''):'<div class="small muted">Sin hallazgos registrados.</div>'}</div>
     `:`<div class="empty card">Esta auditoría todavía no tiene requisitos validados.</div>`}
     ${A.inst==='aucha'?`<div class="sec-title">Alertas de documentos</div>${ALERTAS.map(alertHTML).join('')}`:''}
@@ -781,6 +868,18 @@ function render(){
   updateNet();
 }
 function rerenderList(){ const l=$('#list'); if(l) l.innerHTML = listHTML(); }
+// Cambio de estado desde la lista de terreno, con "Deshacer".
+function applyEstado(r, k, {obs, naMotivo, hist, silent}={}){
+  const snap = {estado:r.estado, obs:r.obs, naMotivo:r.naMotivo, h:r.hist.length};
+  r.estado = k;
+  r.naMotivo = k==='na' ? (naMotivo||r.naMotivo||'') : '';
+  if(obs!=null) r.obs = obs;
+  addHist(r, hist || (k==='na' ? `Marcado como “No aplica”: ${r.naMotivo}` : `Marcado como “${ESTADOS[k]}”${obs?' con nota':''}`));
+  save(true); render();
+  if(silent) return;
+  const msg = k==='pendiente' ? 'Volvió a Pendientes' : `${ESTADOS[k]} · ${r.titulo.length>28 ? r.titulo.slice(0,28)+'…' : r.titulo}`;
+  toast(msg, ()=>{ Object.assign(r, {estado:snap.estado, obs:snap.obs, naMotivo:snap.naMotivo}); r.hist.length=snap.h; save(true); render(); toast('Cambio deshecho'); });
+}
 
 /* =========================================================================
    ACCIONES
@@ -837,17 +936,18 @@ function demoAudit({nombre, fecha, publicada, cerrada, set, obs, quien}){
   a.reqs = REQ_TEMPLATES.map(t=>({...t, val:'validado', estado:'pendiente', obs:'', evidencias:[], hist:[
     {f:fecha+'T10:00:00Z', a:'Requisito generado desde '+DOCS_AUCHA.find(d=>d.id===t.fuente.doc).numero, q:'Sistema'},
     {f:publicada+'T15:30:00Z', a:'Validado para la auditoría', q:a.validador}]}));
-  a.reqs.forEach(r=>{ if(set[r.id]){ r.estado=set[r.id]; r.obs=obs[r.id]||''; r.evidencias=[{nombre:`evidencia_${r.id.toLowerCase()}.jpg`, fecha:publicada, sync:true}]; r.hist.push({f:publicada+'T18:00:00Z', a:`Marcado como “${ESTADOS[r.estado]}” con 1 evidencia`, q:quien}); }});
+  a.reqs.forEach(r=>{ if(set[r.id]){ r.estado=set[r.id]; r.obs=obs[r.id] || (r.estado==='no_cumple' ? 'Hallazgo registrado en terreno; ver evidencia.' : '');
+      if(r.estado==='na') r.naMotivo = r.tema==='Construcción' ? NA_MOTIVOS[1] : NA_MOTIVOS[0]; r.evidencias=[{nombre:`evidencia_${r.id.toLowerCase()}.jpg`, fecha:publicada, sync:true}]; r.hist.push({f:publicada+'T18:00:00Z', a:`Marcado como “${ESTADOS[r.estado]}” con 1 evidencia`, q:quien}); }});
   a.status = cerrada ? 'cerrada' : 'publicada'; a.publicada = publicada; a.cerrada = cerrada || null;
   return a;
 }
 function demo(){
   S = freshState();
-  const q3set = {}; REQ_TEMPLATES.forEach((t,i)=>{ q3set[t.id] = i%9===4 ? 'no_cumple' : i%7===3 ? 'parcial' : i%11===10 ? 'na' : 'cumple'; });
+  const q3set = {}; REQ_TEMPLATES.forEach((t,i)=>{ q3set[t.id] = i%9===4 || i%13===3 ? 'no_cumple' :i%11===10 ? 'na' : 'cumple'; });
   const q3 = demoAudit({ nombre:'Auditoría interna Q3 2026', fecha:'2026-07-08', publicada:'2026-07-10', cerrada:'2026-07-24', set:q3set,
     obs:{R06:'Bitácora diaria incompleta en junio.', R13:'Ducha lavaojos sin señalética.', R22:'Capacitación agendada para agosto.'}, quien:'Jefe de piscicultura' });
   const q4 = demoAudit({ nombre:'Auditoría interna Q4 2026', fecha:'2026-10-14', publicada:'2026-10-15', quien:'Jefe de piscicultura',
-    set:{R01:'cumple',R02:'parcial',R03:'cumple',R05:'cumple',R06:'cumple',R09:'cumple',R10:'cumple',R11:'cumple',R12:'no_cumple',R13:'cumple',R16:'cumple',R20:'parcial',R21:'cumple',R27:'cumple',R28:'no_cumple',R30:'cumple',R35:'na'},
+    set:{R01:'cumple',R02:'no_cumple',R03:'cumple',R05:'cumple',R06:'cumple',R09:'cumple',R10:'cumple',R11:'cumple',R12:'no_cumple',R13:'cumple',R16:'cumple',R20:'no_cumple',R21:'cumple',R27:'cumple',R28:'no_cumple',R30:'cumple',R35:'na'},
     obs:{R02:'Grupos de 635 y 750 kVA con silenciador nuevo; falta el de 50 kVA en L2.', R12:'Faltan registros de pH de 3 días de la semana pasada.', R20:'Limpieza realizada, pero falta la guía de despacho de septiembre.', R28:'Envases de aerosol con fecha de ingreso de marzo 2026 (más de 6 meses).'} });
   S.audits = [q3, q4]; S.centro='aucha'; S.cur=q4.id; syncA();
   save(); toast('Ejemplo cargado: 2 auditorías en Piscicultura Aucha'); location.hash='#/centro/aucha'; render();
@@ -915,8 +1015,49 @@ document.addEventListener('click', e=>{
       break;
     }
     case 'publish': publish(); break;
-    case 'tab': S.tab=el.dataset.t; save(); render(); break;
-    case 'set-estado': { const k=el.dataset.k; req.estado = req.estado===k ? 'pendiente' : k; addHist(req, req.estado==='pendiente'?'Estado borrado':`Marcado como “${ESTADOS[k]}”`); save(true); render(); toast(req.estado==='pendiente'?'Estado borrado':`Guardado: ${ESTADOS[k]}`); break; }
+    case 'tab': S.tab=el.dataset.t; S.naPick=null; S.notePick=null; S.noteDraft=null; save(); render(); break;
+    case 'set-estado': {
+      const k=el.dataset.k;
+      if(req.estado!==k && k==='no_cumple' && !(($('#obs')?.value||req.obs||'').trim())){
+        toast(`Para marcar ${ESTADOS[k]} escribe primero la observación`); const o=$('#obs'); o?.classList.add('need'); o?.focus(); break;
+      }
+      const o=$('#obs'); if(o && o.value!==req.obs) req.obs=o.value;
+      if(k==='na' && req.estado!=='na'){ req.estado='na'; req.naMotivo=req.naMotivo||''; addHist(req,'Marcado como “No aplica”'); save(true); render(); toast('Elige el motivo de No aplica'); break; }
+      req.estado = req.estado===k ? 'pendiente' : k; if(req.estado!=='na') req.naMotivo='';
+      addHist(req, req.estado==='pendiente'?'Estado borrado':`Marcado como “${ESTADOS[k]}”`); save(true); render(); toast(req.estado==='pendiente'?'Estado borrado':`Guardado: ${ESTADOS[k]}`); break;
+    }
+    case 'quick-estado': {
+      const k=el.dataset.k;
+      if(req.estado===k){ applyEstado(req, 'pendiente', {hist:'Estado borrado'}); break; }
+      if(k==='cumple'){ applyEstado(req, k); break; }
+      if(k==='na'){ S.notePick=null; S.naPick = S.naPick===id ? null : id; rerenderList(); break; }
+      S.naPick=null; S.noteDraft=null; S.notePick={id, k}; rerenderList(); setTimeout(()=>$('#q-note')?.focus(),30); break;
+    }
+    case 'na-cancel': S.naPick=null; rerenderList(); break;
+    case 'na-motivo': {
+      const m=el.dataset.m;
+      if(document.querySelector('#obs')){ req.naMotivo=m; addHist(req,`Motivo de No aplica: ${m}`); save(true); render(); toast('Motivo guardado'); break; }
+      S.naPick=null;
+      if(m==='Otro motivo'){ applyEstado(req,'na',{naMotivo:m, silent:true}); location.hash='#/req/'+id; setTimeout(()=>{ const o=$('#obs'); o?.classList.add('need'); o?.focus(); },60); toast('Describe el motivo en la observación'); break; }
+      applyEstado(req,'na',{naMotivo:m}); break;
+    }
+    case 'note-cancel': S.notePick=null; S.noteDraft=null; rerenderList(); break;
+    case 'note-save': {
+      const note=($('#q-note')?.value||'').trim(), k=S.notePick.k;
+      if(!note){ toast('La nota es obligatoria para '+ESTADOS[k]); $('#q-note')?.classList.add('need'); $('#q-note')?.focus(); break; }
+      S.notePick=null; S.noteDraft=null; applyEstado(req, k, {obs:note}); break;
+    }
+    case 'tema-na': {
+      e.preventDefault();
+      const t=el.dataset.t, items=activeReqs().filter(r=>r.tema===t && r.estado==='pendiente');
+      askConfirm({titulo:`¿“${t}” no aplica?`, texto:`Se marcarán ${items.length} requisitos pendientes como No aplica, con el motivo “${NA_MOTIVOS[0]}”. Podrás cambiar cada uno después.`, ok:'Marcar No aplica'}, ()=>{
+        const snap = items.map(r=>({r, estado:r.estado, naMotivo:r.naMotivo, h:r.hist.length}));
+        items.forEach(r=>{ r.estado='na'; r.naMotivo=NA_MOTIVOS[0]; addHist(r,`Marcado como “No aplica” (tema completo): ${NA_MOTIVOS[0]}`); });
+        save(true); render();
+        toast(`${items.length} requisitos marcados No aplica`, ()=>{ snap.forEach(s=>{ s.r.estado=s.estado; s.r.naMotivo=s.naMotivo; s.r.hist.length=s.h; }); save(true); render(); toast('Cambio deshecho'); });
+      }); break;
+    }
+    case 'undo': { const fn=undoFn; undoFn=null; el.closest('.toast')?.remove(); fn && fn(); break; }
     case 'ev-photo': evTarget=id; $('#file-photo').click(); break;
     case 'ev-file': evTarget=id; $('#file-any').click(); break;
     case 'ev-del': { req.evidencias.splice(+el.dataset.i,1); addHist(req,'Evidencia eliminada'); save(true); render(); break; }
@@ -932,10 +1073,13 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('input', e=>{
   if(e.target.id==='q'){ S.q=e.target.value; rerenderList(); }
+  if(e.target.id==='q-note' || e.target.id==='obs'){ S.noteDraft = e.target.id==='q-note' ? e.target.value : S.noteDraft; e.target.classList.remove('need'); }
   if(e.target.id==='validador'){ A.validador=e.target.value; const b=$('#pub-btn'); if(b) b.disabled=!e.target.value.trim() || !A.reqs.some(r=>r.val!=='descartado' && !A.temasOff.includes(r.tema)); }
 });
 document.addEventListener('change', e=>{
-  if(e.target.id==='obs'){ const r=A.reqs.find(x=>x.id===e.target.dataset.id); r.obs=e.target.value; addHist(r,'Observación actualizada'); save(true); }
+  if(e.target.id==='obs'){ const r=A.reqs.find(x=>x.id===e.target.dataset.id);
+    if(!e.target.value.trim() && r.estado==='no_cumple'){ e.target.value=r.obs; toast(`La observación es obligatoria para ${ESTADOS[r.estado]}`); return; }
+    r.obs=e.target.value; addHist(r,'Observación actualizada'); save(true); }
   if(e.target.id==='validador') save();
   if(e.target.id==='file-doc' && e.target.files[0]){ const f=e.target.files[0]; A.extras.push({id:'X'+Date.now(), tipo:'Documento', numero:f.name, titulo:'Cargado por el usuario · se procesará al generar', vigencia:'Por verificar', estado:'info'}); save(); render(); toast('Documento cargado'); }
   if(e.target.id==='file-pert' && e.target.files[0]){ const f=e.target.files[0]; A.perts.push({id:'P'+Date.now(), numero:f.name, titulo:'Pertinencia cargada por el usuario', cargada:true}); save(); render(); }

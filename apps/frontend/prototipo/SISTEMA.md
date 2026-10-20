@@ -70,14 +70,33 @@ Centro (instalación)
 | `#/nueva` | **Crear nueva auditoría** | Centro, tipo, nombre y fecha programada. Al crearla se pasa directo a Preparar. |
 | `#/a/{id}[/vista]` | (ruta técnica) | Abre una auditoría y redirige a la pantalla que corresponde a su estado. |
 | `#/preparar` | **Preparar** (asistente de 4 pasos) | Ver sección 4. |
-| `#/terreno` | **Terreno** | Progreso con semáforo, buscador, pestañas Pendientes/Llenados, requisitos agrupados por temática y botón "+ Agregar requisito encontrado en terreno". |
-| `#/req/{id}` | **Detalle de requisito** | Botones Cumple/Parcial/No cumple/No aplica, observación, evidencias (foto o archivo), ficha del requisito (fuente, referencia, frecuencia, vencimiento, validador) e historial. |
+| `#/terreno` | **Terreno** | Progreso con semáforo, buscador, pestañas **Todos / Llenados / Pendientes**, requisitos agrupados por temática (en cada una, los pendientes arriba y los ya marcados abajo), **estado rápido en cada fila** (ver "Llenado rápido en terreno"), "Tema no aplica" y botón "+ Agregar requisito encontrado en terreno". |
+| `#/req/{id}` | **Detalle de requisito** | Botones Cumple/No cumple/No aplica, motivo de No aplica, observación, evidencias (foto o archivo), ficha del requisito (fuente, referencia, frecuencia, vencimiento, validador) e historial. |
+
+### Llenado rápido en terreno
+
+Pestañas:
+
+- **Todos** (por defecto): todos los requisitos, con y sin estado. Dentro de cada temática, los pendientes van primero y los ya marcados bajan al final. El contador de la temática muestra marcados/total.
+- **Llenados:** solo los que tienen estado.
+- **Pendientes:** solo los que faltan.
+
+Un requisito **ya marcado** se ve como un recuadro del color de su estado, con la etiqueta, la nota o el motivo de N/A, y sin botones. Para corregirlo se toca el recuadro y se cambia en el detalle.
+
+Cada requisito **pendiente** tiene los botones **Cumple · No cumple · N/A**, así que no hace falta abrir el requisito. No existe "Parcial": la planilla que usa hoy Invermar solo tiene SÍ / NO / N/A.
+
+- **Cumple:** se guarda con un toque.
+- **No cumple:** se abre un panel bajo la fila que **exige una nota** (no se guarda sin ella). La foto o el archivo adjunto son **opcionales**.
+- **N/A:** se elige un motivo: "La actividad no se realiza en el centro", "No corresponde a la fase actual del proyecto", "Su plazo o frecuencia no cae en este periodo" u "Otro motivo". "Otro motivo" abre el detalle para escribirlo en la observación.
+- **Tema no aplica:** en Todos y Pendientes, cada temática con más de un requisito pendiente permite marcarlos todos como No aplica de una vez, previa confirmación.
+- Cada cambio muestra un aviso con **Deshacer** durante 5 segundos.
+- Las mismas reglas valen en el detalle: no se puede marcar No cumple sin una nota, ni dejar vacía su observación después.
 | `#/panel` | **Panel de cumplimiento** | KPIs, botón "Cerrar auditoría", historial de auditorías del centro, cumplimiento por temática, próximos vencimientos, hallazgos y alertas de documentos. |
 
 Elementos globales:
 
 - **Barra superior:** centro y auditoría abierta, indicador de conexión ("En línea", "Sin conexión · N por sincronizar") y botón de tema claro/oscuro (por defecto claro; la elección se recuerda).
-- **Navegación:** Centros · Preparar · Terreno · Panel (barra inferior en celular, lateral en escritorio).
+- **Navegación:** solo aparece **dentro de una auditoría** (Preparar, Terreno, Detalle y Panel): Auditorías (vuelve a las auditorías del centro) · Terreno · Panel. Es una barra inferior en celular y lateral en escritorio. En Centros, Auditorías del centro y Crear nueva auditoría no hay barra, porque todavía no se sabe a qué auditoría se entra. A Preparar se llega desde la tarjeta de la auditoría ("Continuar preparación" o "Validar requisitos").
 - **Chat de normativa** (botón flotante): responde preguntas sobre la normativa del centro **citando siempre la fuente**.
 
 ---
@@ -115,12 +134,15 @@ Elementos globales:
 
 ### Requisito: resultado en terreno (`estado`)
 
-`pendiente` · `cumple` · `parcial` · `no_cumple` · `na` (no aplica).
+`pendiente` · `cumple` · `no_cumple` · `na` (no aplica).
+
+- `no_cumple` requiere `obs` (nota) no vacía; las evidencias son opcionales.
+- `na` guarda su motivo en `naMotivo`.
 
 ### Cálculo de indicadores
 
 - **Avance** = requisitos llenados / requisitos validados.
-- **Cumplimiento** = (cumple + 0,5 × parcial) / (cumple + parcial + no cumple). Los "No aplica" no cuentan.
+- **Cumplimiento** = cumple / (cumple + no cumple). Los "No aplica" no cuentan.
 - Semáforo de colores: ≥ 85 % verde, ≥ 65 % amarillo y bajo eso rojo.
 
 ---
@@ -225,7 +247,7 @@ Cada requisito guarda un historial con fecha, acción y responsable:
 
 - generado desde un documento específico;
 - validado, editado, descartado o agregado manualmente;
-- marcado como Cumple, Parcial, No cumple o No aplica;
+- marcado como Cumple, No cumple o No aplica;
 - evidencia agregada o eliminada, observación actualizada.
 
 Las auditorías cerradas quedan en **solo lectura**, lo que permite comparar en el tiempo el cumplimiento de un mismo centro (historial en el Panel).

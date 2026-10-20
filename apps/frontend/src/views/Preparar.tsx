@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "react-router";
 import { actions, attempt, run, useFacilityContext } from "../api";
 import { Icon } from "../components/Icon";
-import { Crumb, QueryState } from "../components/ui";
+import { Crumb, ProcessingBanner, QueryState } from "../components/ui";
 import { categoriesOf, sourceLabel } from "../domain/audit";
 import { fmtDate } from "../domain/format";
 import {
@@ -164,6 +164,7 @@ function PasoDocs({ a }: { a: AuditDetail }) {
   );
   return (
     <div className="stack">
+      <ProcessingBanner facilityId={a.facilityId} />
       <div className="card">
         <h3>Documentos de la instalación</h3>
         <p className="small muted" style={{ margin: "4px 0 12px" }}>
@@ -341,6 +342,7 @@ function Generar({ a }: { a: AuditDetail }) {
 
   return (
     <div className="stack">
+      <ProcessingBanner facilityId={a.facilityId} />
       <div className="card">
         <h3>Generar listado de requisitos</h3>
         <p className="small muted" style={{ margin: "4px 0 12px" }}>
@@ -423,6 +425,7 @@ function PasoReqs({ a }: { a: AuditDetail }) {
 
   return (
     <div className="stack">
+      <ProcessingBanner facilityId={a.facilityId} />
       {!list.length && (
         <div className="alert warn">
           <div>

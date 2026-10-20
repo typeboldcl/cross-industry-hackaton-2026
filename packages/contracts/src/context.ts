@@ -7,6 +7,8 @@ export type DocumentStatus = "ok" | "warn" | "info";
 
 export type FacilityDocument = DocumentSummary & {
   processingStatus: DocumentProcessingStatus;
+  sectionsDone: number;
+  sectionsTotal: number;
   status: DocumentStatus;
   statusNote: string | null;
 };

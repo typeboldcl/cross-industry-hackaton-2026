@@ -4,7 +4,7 @@ import type {
   FacilityAlert,
 } from "@hackaton/contracts";
 import { Link } from "react-router";
-import { useFacilityContext } from "../api";
+import { processingDocuments, useFacilityContext } from "../api";
 import type { Stats } from "../domain/audit";
 import { daysTo, pctLabel } from "../domain/format";
 import { RESULT_CSS } from "../domain/labels";
@@ -74,6 +74,43 @@ export function AlertBox({ a }: { a: FacilityAlert }) {
       <div>
         <b>{a.title}</b>
         {a.text}
+      </div>
+    </div>
+  );
+}
+
+export function ProcessingBanner({ facilityId }: { facilityId: string }) {
+  const ctx = useFacilityContext(facilityId);
+  const docs = processingDocuments(ctx.data);
+  if (!docs.length) return null;
+  return (
+    <div className="alert info processing" role="status" aria-live="polite">
+      <div className="grow">
+        <b>
+          <span className="spinner" aria-hidden /> Extrayendo requisitos…
+        </b>
+        Los nuevos requisitos aparecen aquí a medida que se procesa cada
+        sección.
+        {docs.map((d) => (
+          <div key={d.id} className="processing-doc">
+            <div className="small">
+              {d.number ?? d.title} ·{" "}
+              {d.processingStatus === "queued" || !d.sectionsTotal
+                ? "en cola"
+                : `${d.sectionsDone} de ${d.sectionsTotal} secciones`}
+            </div>
+            <div className="progress">
+              <i
+                style={{
+                  width: d.sectionsTotal
+                    ? `${(d.sectionsDone / d.sectionsTotal) * 100}%`
+                    : "0%",
+                  background: "var(--info)",
+                }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

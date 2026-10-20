@@ -6,6 +6,7 @@ import type {
   CategoryNotApplicableRequest,
   CreateAuditRequest,
   DocumentKind,
+  FacilityContext,
   ImportDocumentRequest,
   UpdateDraftRequest,
 } from "@hackaton/contracts";
@@ -36,6 +37,21 @@ useSession.subscribe((s, prev) => {
   if (s.apiMode !== prev.apiMode) queryClient.clear();
 });
 
+const LIVE_REFRESH_MS = 4_000;
+
+export const processingDocuments = (ctx: FacilityContext | undefined) =>
+  ctx?.documents.filter(
+    (d) =>
+      d.processingStatus === "queued" || d.processingStatus === "processing",
+  ) ?? [];
+
+const whileProcessing = (facilityId: string | undefined) => () =>
+  processingDocuments(
+    queryClient.getQueryData<FacilityContext>(keys.context(facilityId ?? "")),
+  ).length > 0
+    ? LIVE_REFRESH_MS
+    : false;
+
 const keys = {
   facilities: ["facilities"] as const,
   context: (id: string) => ["context", id] as const,
@@ -60,6 +76,7 @@ export const useFacilityContext = (facilityId: string | undefined) =>
     queryKey: keys.context(facilityId ?? ""),
     queryFn: () => api().facilities.context(facilityId!),
     enabled: !!facilityId,
+    refetchInterval: whileProcessing(facilityId),
   });
 
 /** Requisitos de la instalación (todas sus versiones vigentes). */
@@ -68,6 +85,7 @@ export const useObligations = (facilityId: string | undefined) =>
     queryKey: keys.obligations(facilityId ?? ""),
     queryFn: () => api().obligations.list(facilityId!),
     enabled: !!facilityId,
+    refetchInterval: whileProcessing(facilityId),
   });
 
 export const useAudit = (auditId: string | undefined) =>

@@ -73,6 +73,8 @@ export class ContextService {
       return {
         ...summary,
         processingStatus: own.processingStatus,
+        sectionsDone: own.sectionsDone,
+        sectionsTotal: own.sectionsTotal,
         ...deriveDocumentStatus(own, facts),
       };
     });

@@ -503,6 +503,33 @@ textarea {
   display: block;
   margin-bottom: 2px;
 }
+.processing-doc {
+  margin-top: 8px;
+}
+.processing-doc .progress i {
+  transition: width 0.6s ease;
+}
+.spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 4px;
+  border: 2px solid color-mix(in srgb, var(--info) 30%, transparent);
+  border-top-color: var(--info);
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
 /* Home */
 .hero {
   background: linear-gradient(

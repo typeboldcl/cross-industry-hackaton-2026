@@ -265,6 +265,8 @@ export const demoApi: AuditApi = {
           textExtractedAt: null,
           createdAt: at,
           processingStatus: "done" as const,
+          sectionsDone: 0,
+          sectionsTotal: 0,
           status: "info" as const,
           statusNote: "Cargado en modo demo: no se procesa",
         };
@@ -294,6 +296,8 @@ export const demoApi: AuditApi = {
           textExtractedAt: at,
           createdAt: at,
           processingStatus: "done" as const,
+          sectionsDone: 0,
+          sectionsTotal: 0,
           status: "ok" as const,
           statusNote: "Descargado del SEIA",
         };

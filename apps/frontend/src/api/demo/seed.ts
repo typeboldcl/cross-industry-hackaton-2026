@@ -84,6 +84,8 @@ export function emptyDb(): DemoDb {
     textExtractedAt: created,
     createdAt: created,
     processingStatus: "done" as const,
+    sectionsDone: 0,
+    sectionsTotal: 0,
     status: d.estado ?? "info",
     statusNote: d.vigencia ?? null,
     // Clave del documento en los datos de ejemplo (D1…D4), para ligar requisitos.

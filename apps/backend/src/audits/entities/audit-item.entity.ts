@@ -1,4 +1,4 @@
-import type { AuditResult } from "@hackaton/contracts";
+import type { AuditResult, NaReason } from "@hackaton/contracts";
 import { Column, Entity, PrimaryGeneratedColumn, Unique } from "typeorm";
 
 @Entity({ name: "audit_item" })
@@ -18,11 +18,17 @@ export class AuditItemEntity {
   @Column({ name: "obligation_version_id", type: "uuid" })
   obligationVersionId: string;
 
+  @Column({ type: "integer", default: 0 })
+  position: number;
+
   @Column({ type: "text", default: "pending" })
   result: AuditResult;
 
   @Column({ type: "text", nullable: true })
   notes: string | null;
+
+  @Column({ name: "na_reason", type: "text", nullable: true })
+  naReason: NaReason | null;
 
   @Column({ name: "assessed_by_name", type: "text", nullable: true })
   assessedByName: string | null;

@@ -49,27 +49,38 @@ describe("audit flow", () => {
     const sma = await validatedObligation(smaId, "Medir efluentes");
     await validatedObligation(seremiId, "Rotular residuos peligrosos");
 
-    const { body: audit } = (await request(app.getHttpServer())
+    const { body: created } = (await request(app.getHttpServer())
       .post("/api/audits")
+      .set("X-Actor-Name", "Jefa de centro")
       .send({
         facilityId,
-        authorityId: smaId,
-        kind: "auditoría interna",
-        periodFrom: "2026-07-01",
-        periodTo: "2026-09-30",
+        title: "Auditoría interna Q4 2026",
+        kind: "interna",
         plannedOn: "2026-10-21",
+        authorityId: smaId,
       })
       .expect(201)) as { body: AuditDetail };
+    expect(created.status).toBe("draft");
+    expect(created.items).toHaveLength(0);
 
-    expect(audit.status).toBe("planned");
-    expect(audit.items.map((item) => item.version.title)).toContain(
-      "Medir efluentes",
-    );
-    expect(audit.items.map((item) => item.version.title)).not.toContain(
-      "Rotular residuos peligrosos",
-    );
+    await request(app.getHttpServer())
+      .post(`/api/audits/${created.id}/generate`)
+      .expect(200);
+    const { body: audit } = (await request(app.getHttpServer())
+      .post(`/api/audits/${created.id}/publish`)
+      .set("X-Actor-Name", "Responsable cumplimiento")
+      .send({ excludedCategories: [] })
+      .expect(200)) as { body: AuditDetail };
+
+    expect(audit.status).toBe("published");
+    expect(audit.validatedByName).toBe("Responsable cumplimiento");
     const item = audit.items.find((i) => i.obligationId === sma.obligationId)!;
 
+    await request(app.getHttpServer())
+      .patch(`/api/audit-items/${item.id}`)
+      .set("X-Actor-Name", "Auditora")
+      .send({ result: "non_compliant" })
+      .expect(400);
     const assessed = await request(app.getHttpServer())
       .patch(`/api/audit-items/${item.id}`)
       .set("X-Actor-Name", "Auditora")
@@ -89,6 +100,8 @@ describe("audit flow", () => {
     const first = await upload().expect(201);
     const replay = await upload().expect(200);
     expect(replay.body.id).toBe(first.body.id);
+    expect(first.body.filename).toBe("foto.jpg");
+    expect(first.body.thumbUrl).toBe(`/api/evidence/${first.body.id}/file`);
 
     const { body: compliance } = await request(app.getHttpServer())
       .get(`/api/facilities/${facilityId}/compliance`)
@@ -101,7 +114,7 @@ describe("audit flow", () => {
     const { body: detail } = await request(app.getHttpServer())
       .get(`/api/audits/${audit.id}`)
       .expect(200);
-    expect(detail.status).toBe("in_progress");
+    expect(detail.status).toBe("published");
     expect(
       detail.items.find((i: { id: string }) => i.id === item.id).evidence,
     ).toHaveLength(1);

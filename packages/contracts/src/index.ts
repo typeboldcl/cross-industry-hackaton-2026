@@ -4,6 +4,7 @@ export type {
   CreateFacilityRequest,
   Facility,
   FacilityKind,
+  FacilityListItem,
 } from "./facilities.js";
 export type {
   DocumentDetail,
@@ -18,6 +19,7 @@ export type {
 export type {
   ObligationDetail,
   ObligationListItem,
+  ObligationOrigin,
   ObligationSource,
   ObligationStatus,
   ObligationVersion,
@@ -27,14 +29,19 @@ export type {
 } from "./obligations.js";
 export type {
   AddAuditItemRequest,
+  AddManualRequirementRequest,
   AssessItemRequest,
   AuditDetail,
   AuditItem,
+  AuditKind,
   AuditResult,
   AuditStatus,
   AuditSummary,
+  CategoryNotApplicableRequest,
   CreateAuditRequest,
   Evidence,
+  NaReason,
+  PublishAuditRequest,
 } from "./audits.js";
 export type { ComplianceState, FacilityCompliance } from "./compliance.js";
 export type { SeiaDocument, SeiaPertinencia, SeiaProject } from "./seia.js";

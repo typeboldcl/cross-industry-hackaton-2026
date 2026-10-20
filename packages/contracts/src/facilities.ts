@@ -6,8 +6,13 @@ export interface Facility {
   kind: FacilityKind;
   name: string;
   comuna: string;
+  location: string | null;
   externalCodes: Record<string, string>;
   createdAt: string;
+}
+
+export interface FacilityListItem extends Facility {
+  summary: { score: number | null; audits: number; openAudits: number };
 }
 
 export interface Authority {
@@ -21,5 +26,6 @@ export interface CreateFacilityRequest {
   kind: FacilityKind;
   name: string;
   comuna: string;
+  location?: string | null;
   externalCodes?: Record<string, string>;
 }

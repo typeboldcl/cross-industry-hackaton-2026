@@ -16,6 +16,7 @@ const STATUSES: ObligationStatus[] = [
   "validated",
   "superseded",
   "revoked",
+  "rejected",
 ];
 
 export class ListObligationsQuery {

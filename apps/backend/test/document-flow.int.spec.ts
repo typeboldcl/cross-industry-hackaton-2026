@@ -41,9 +41,24 @@ describe.skipIf(!existsSync(SAMPLE))("document flow", () => {
           attributes: {},
           quote: quoteFrom(req),
         },
+        {
+          title: "Rotular los envases de sustancias peligrosas",
+          body: "Mantener la rotulación según la NCh 2190.",
+          category: "sustancias peligrosas",
+          authorityCode: "SEREMI_SALUD",
+          phase: "operacion",
+          frequency: null,
+          expectedEvidence: null,
+          dueDate: null,
+          attributes: {},
+          quote: quoteFrom(req),
+        },
       ],
     })));
     db = app.get(DataSource);
+    await db.query(`DELETE FROM evidence`);
+    await db.query(`DELETE FROM audit_item`);
+    await db.query(`DELETE FROM audit`);
     await db.query(`DELETE FROM obligation_source`);
     await db.query(`DELETE FROM obligation_version`);
     await db.query(`DELETE FROM obligation`);
@@ -113,6 +128,26 @@ describe.skipIf(!existsSync(SAMPLE))("document flow", () => {
       .patch(`/api/obligation-versions/${first?.version.id}`)
       .send({ title: "No debería cambiar" })
       .expect(409);
+
+    const second = (drafts as ObligationListItem[])[1];
+    expect(second).toBeDefined();
+    if (second) {
+      const edited = await request(app.getHttpServer())
+        .patch(`/api/obligation-versions/${second.version.id}`)
+        .send({ title: "Título corregido" })
+        .expect(200);
+      expect(edited.body.edited).toBe(true);
+      const rejected = await request(app.getHttpServer())
+        .post(`/api/obligation-versions/${second.version.id}/reject`)
+        .set("X-Actor-Name", "Responsable Aucha")
+        .expect(200);
+      expect(rejected.body.status).toBe("rejected");
+      const restored = await request(app.getHttpServer())
+        .post(`/api/obligation-versions/${second.version.id}/restore`)
+        .set("X-Actor-Name", "Responsable Aucha")
+        .expect(200);
+      expect(restored.body.status).toBe("draft");
+    }
 
     const reprocessed = await request(app.getHttpServer())
       .post(`/api/documents/${created.body.id}/extraction`)

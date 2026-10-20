@@ -7,6 +7,7 @@ const DOCUMENT_KINDS: DocumentKind[] = [
   "pertinencia",
   "res_sanitaria",
   "norma",
+  "otro",
 ];
 
 export class UploadDocumentDto {

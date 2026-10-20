@@ -13,6 +13,7 @@ export function toFacility(entity: FacilityEntity): Facility {
     kind: entity.kind,
     name: entity.name,
     comuna: entity.comuna,
+    location: entity.location,
     externalCodes: entity.externalCodes,
     createdAt: entity.createdAt.toISOString(),
   };

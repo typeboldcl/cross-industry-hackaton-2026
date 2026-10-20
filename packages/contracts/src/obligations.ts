@@ -1,6 +1,9 @@
 import type { Authority } from "./facilities.js";
 
-export type ObligationStatus = "draft" | "validated" | "superseded" | "revoked";
+export type ObligationStatus =
+  "draft" | "validated" | "superseded" | "revoked" | "rejected";
+
+export type ObligationOrigin = "extracted" | "manual";
 
 export type Phase = "construccion" | "operacion" | "cierre";
 
@@ -27,6 +30,8 @@ export interface ObligationVersion {
   dueDate: string | null;
   dueRule: Record<string, unknown> | null;
   attributes: Record<string, unknown>;
+  amendmentNote: string | null;
+  edited: boolean;
   status: ObligationStatus;
   validatedBy: string | null;
   validatedAt: string | null;
@@ -41,6 +46,7 @@ export interface ObligationVersion {
 export interface ObligationListItem {
   obligationId: string;
   key: string;
+  origin: ObligationOrigin;
   category: string;
   authority: Authority;
   version: ObligationVersion;
@@ -51,6 +57,7 @@ export interface ObligationDetail {
   id: string;
   facilityId: string;
   key: string;
+  origin: ObligationOrigin;
   category: string;
   authority: Authority;
   versions: ObligationVersion[];

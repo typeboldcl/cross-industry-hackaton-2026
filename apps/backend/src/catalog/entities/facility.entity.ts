@@ -25,6 +25,9 @@ export class FacilityEntity {
   @Column({ type: "text" })
   comuna: string;
 
+  @Column({ type: "text", nullable: true })
+  location: string | null;
+
   @Column({ name: "external_codes", type: "jsonb", default: () => "'{}'" })
   externalCodes: Record<string, string>;
 

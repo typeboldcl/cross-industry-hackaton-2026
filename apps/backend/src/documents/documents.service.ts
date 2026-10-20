@@ -31,6 +31,7 @@ const DEFAULT_ISSUER: Record<DocumentKind, string | null> = {
   pertinencia: "SEA",
   res_sanitaria: "SEREMI_SALUD",
   norma: null,
+  otro: null,
 };
 
 export interface UploadedPdf {
@@ -109,7 +110,7 @@ export class DocumentsService {
       return { document: await this.detail(raced.id), created: false };
     }
 
-    await this.dispatcher.dispatch(id);
+    if (kind !== "otro") await this.dispatcher.dispatch(id);
     return { document: await this.detail(id), created: true };
   }
 

@@ -4,6 +4,7 @@ import type {
   AuditResult,
   AuditSummary,
   Evidence,
+  NaReason,
 } from "@hackaton/contracts";
 import {
   BadRequestException,
@@ -14,13 +15,17 @@ import {
 } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { randomUUID } from "node:crypto";
-import type { DataSource } from "typeorm";
+import type { DataSource, EntityManager } from "typeorm";
 import { toAuthority } from "../catalog/catalog.mapper.js";
 import { AuthorityEntity } from "../catalog/entities/authority.entity.js";
 import { sha256Hex } from "../llm/canonical-json.js";
 import { ObligationsService } from "../obligations/obligations.service.js";
 import { STORAGE, type StorageService } from "../storage/storage.service.js";
-import type { AssessItemDto, CreateAuditDto } from "./audits.dto.js";
+import type {
+  AddManualRequirementDto,
+  AssessItemDto,
+  CreateAuditDto,
+} from "./audits.dto.js";
 import { AuditItemEntity } from "./entities/audit-item.entity.js";
 import { AuditEntity } from "./entities/audit.entity.js";
 import { EvidenceEntity } from "./entities/evidence.entity.js";
@@ -35,6 +40,7 @@ const RESULTS: AuditResult[] = [
 export interface UploadedFile {
   buffer: Buffer;
   mimetype: string;
+  originalname: string;
 }
 
 @Injectable()
@@ -45,33 +51,66 @@ export class AuditsService {
     private readonly obligations: ObligationsService,
   ) {}
 
-  async create(dto: CreateAuditDto): Promise<AuditDetail> {
-    if (dto.periodFrom > dto.periodTo) {
+  async create(
+    dto: CreateAuditDto,
+    actor: string | null,
+  ): Promise<AuditDetail> {
+    if (dto.periodFrom && dto.periodTo && dto.periodFrom > dto.periodTo) {
       throw new BadRequestException("El período termina antes de empezar.");
     }
 
-    const id = await this.db.transaction(async (manager) => {
-      const [audit] = await manager.query(
-        `INSERT INTO audit (facility_id, authority_id, kind, period_from, period_to, planned_on)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [
-          dto.facilityId,
-          dto.authorityId,
-          dto.kind,
-          dto.periodFrom,
-          dto.periodTo,
-          dto.plannedOn,
-        ],
+    if (dto.clientId) {
+      const replay = await this.db
+        .getRepository(AuditEntity)
+        .findOneBy({ clientId: dto.clientId });
+      if (replay) return this.detail(replay.id);
+    }
+
+    const [audit] = await this.db.query(
+      `INSERT INTO audit (facility_id, authority_id, title, kind, period_from, period_to, planned_on, created_by_name, client_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [
+        dto.facilityId,
+        dto.authorityId ?? null,
+        dto.title.trim(),
+        dto.kind,
+        dto.periodFrom ?? null,
+        dto.periodTo ?? null,
+        dto.plannedOn,
+        actor,
+        dto.clientId ?? null,
+      ],
+    );
+    return this.detail(audit.id);
+  }
+
+  async generate(id: string): Promise<AuditDetail> {
+    const audit = await this.writableAudit(id);
+    if (audit.status === "draft") {
+      await this.db.query(
+        `UPDATE audit SET status = 'in_validation' WHERE id = $1`,
+        [id],
       );
+    }
+    return this.detail(id);
+  }
+
+  async publish(
+    id: string,
+    excludedCategories: string[],
+    actor: string,
+  ): Promise<AuditDetail> {
+    const audit = await this.writableAudit(id);
+    if (audit.status === "published") {
+      throw new ConflictException("La auditoría ya está publicada.");
+    }
+
+    await this.db.transaction(async (manager) => {
       await manager.query(
-        `INSERT INTO audit_item (audit_id, obligation_version_id)
-         SELECT $1, v.id
-         FROM obligation_version v
-         JOIN obligation o ON o.id = v.obligation_id
-         WHERE o.facility_id = $2 AND o.authority_id = $3 AND v.status = 'validated'`,
-        [audit.id, dto.facilityId, dto.authorityId],
+        `UPDATE audit SET status = 'published', published_at = now(), validated_by_name = $2, excluded_categories = $3 WHERE id = $1`,
+        [id, actor, excludedCategories],
       );
-      return audit.id as string;
+      await this.addValidatedItems(manager, audit, excludedCategories);
     });
 
     return this.detail(id);
@@ -93,7 +132,7 @@ export class AuditsService {
     const audit = await this.audit(id);
     const items = await this.db
       .getRepository(AuditItemEntity)
-      .find({ where: { auditId: id } });
+      .find({ where: { auditId: id }, order: { position: "ASC" } });
     const counts = await this.itemCounts([id]);
     return {
       ...this.toSummary(audit, await this.authoritiesById(), counts.get(id)),
@@ -106,24 +145,63 @@ export class AuditsService {
     obligationVersionId: string,
   ): Promise<AuditItem> {
     await this.writableAudit(auditId);
-    const [{ status }] = (await this.db.query(
+    const [version] = (await this.db.query(
       `SELECT status FROM obligation_version WHERE id = $1`,
       [obligationVersionId],
     )) as { status: string }[];
-    if (status !== "validated") {
+    if (version?.status !== "validated") {
       throw new ConflictException("Solo se auditan requisitos validados.");
     }
 
-    await this.db.query(
-      `INSERT INTO audit_item (audit_id, obligation_version_id) VALUES ($1, $2)
-       ON CONFLICT (audit_id, obligation_version_id) DO NOTHING`,
-      [auditId, obligationVersionId],
-    );
-    const item = await this.db
-      .getRepository(AuditItemEntity)
-      .findOneByOrFail({ auditId, obligationVersionId });
-    const [mapped] = await this.toItems([item]);
-    return mapped!;
+    return this.insertItem(this.db.manager, auditId, obligationVersionId);
+  }
+
+  async addManualRequirement(
+    auditId: string,
+    dto: AddManualRequirementDto,
+    actor: string,
+  ): Promise<AuditItem> {
+    const audit = await this.writableAudit(auditId);
+
+    const versionId = await this.db.transaction(async (manager) => {
+      const authorityId =
+        dto.authorityId ??
+        audit.authorityId ??
+        (await manager.query(`SELECT id FROM authority WHERE code = 'SMA'`))[0]
+          .id;
+      const key = `manual/${dto.clientId ?? randomUUID()}`;
+
+      const [obligation] = await manager.query(
+        `INSERT INTO obligation (facility_id, authority_id, category, key, origin)
+         VALUES ($1, $2, $3, $4, 'manual')
+         ON CONFLICT (facility_id, key) DO UPDATE SET key = EXCLUDED.key
+         RETURNING id`,
+        [audit.facilityId, authorityId, dto.category.trim(), key],
+      );
+      const [version] = await manager.query(
+        `INSERT INTO obligation_version
+           (obligation_id, seq, title, body, frequency, expected_evidence, due_date, status, validated_by, validated_at, valid_from)
+         VALUES ($1, 1, $2, $3, $4, $5, $6, 'validated', $7, now(), now())
+         ON CONFLICT (obligation_id, seq) DO UPDATE SET title = obligation_version.title
+         RETURNING id`,
+        [
+          obligation.id,
+          dto.title.trim(),
+          dto.body.trim(),
+          dto.frequency ?? null,
+          dto.expectedEvidence ?? null,
+          dto.dueDate ?? null,
+          actor,
+        ],
+      );
+      return version.id as string;
+    });
+
+    if (audit.status === "published") {
+      return this.insertItem(this.db.manager, auditId, versionId);
+    }
+    const [item] = await this.obligations.versionsById([versionId]);
+    return manualPreview(auditId, item!);
   }
 
   async removeItem(auditId: string, itemId: string): Promise<void> {
@@ -140,28 +218,74 @@ export class AuditsService {
     actor: string,
   ): Promise<AuditItem> {
     const item = await this.item(itemId);
-    await this.writableAudit(item.auditId);
+    const audit = await this.writableAudit(item.auditId);
+    if (audit.status !== "published") {
+      throw new ConflictException("La auditoría todavía no está publicada.");
+    }
+    if (dto.result === "non_compliant" && !dto.notes?.trim()) {
+      throw new BadRequestException("«No cumple» exige una observación.");
+    }
+    if (dto.result === "not_applicable" && !dto.naReason) {
+      throw new BadRequestException("«No aplica» exige un motivo.");
+    }
+    if (dto.naReason === "other" && !dto.notes?.trim()) {
+      throw new BadRequestException("«Otro motivo» exige una explicación.");
+    }
 
-    await this.db.transaction(async (manager) => {
-      await manager.query(
-        `UPDATE audit_item SET result = $2, notes = $3, assessed_by_name = $4, assessed_at = now() WHERE id = $1`,
-        [itemId, dto.result, dto.notes ?? null, actor],
-      );
-      await manager.query(
-        `UPDATE audit SET status = 'in_progress' WHERE id = $1 AND status = 'planned'`,
-        [item.auditId],
-      );
-    });
+    await this.db.query(
+      `UPDATE audit_item SET result = $2, notes = $3, na_reason = $4, assessed_by_name = $5, assessed_at = now() WHERE id = $1`,
+      [
+        itemId,
+        dto.result,
+        dto.notes ?? null,
+        dto.result === "not_applicable" ? dto.naReason : null,
+        actor,
+      ],
+    );
 
     const [mapped] = await this.toItems([await this.item(itemId)]);
     return mapped!;
   }
 
+  async markCategoryNotApplicable(
+    auditId: string,
+    category: string,
+    naReason: NaReason,
+    notes: string | null,
+    actor: string,
+  ): Promise<AuditItem[]> {
+    const audit = await this.writableAudit(auditId);
+    if (audit.status !== "published") {
+      throw new ConflictException("La auditoría todavía no está publicada.");
+    }
+    if (naReason === "other" && !notes?.trim()) {
+      throw new BadRequestException("«Otro motivo» exige una explicación.");
+    }
+
+    const [rows] = await this.db.query(
+      `UPDATE audit_item ai SET result = 'not_applicable', na_reason = $3, notes = $4, assessed_by_name = $5, assessed_at = now()
+       FROM obligation_version v JOIN obligation o ON o.id = v.obligation_id
+       WHERE ai.audit_id = $1 AND v.id = ai.obligation_version_id AND o.category = $2
+       RETURNING ai.id`,
+      [auditId, category, naReason, notes, actor],
+    );
+    const ids = ((rows as { id: string }[] | undefined) ?? []).map((r) => r.id);
+    if (ids.length === 0) return [];
+    const items = await this.db
+      .getRepository(AuditItemEntity)
+      .createQueryBuilder("i")
+      .where("i.id IN (:...ids)", { ids })
+      .orderBy("i.position")
+      .getMany();
+    return this.toItems(items);
+  }
+
   async close(id: string): Promise<AuditDetail> {
     await this.writableAudit(id);
-    await this.db.query(`UPDATE audit SET status = 'closed' WHERE id = $1`, [
-      id,
-    ]);
+    await this.db.query(
+      `UPDATE audit SET status = 'closed', closed_at = now() WHERE id = $1`,
+      [id],
+    );
     return this.detail(id);
   }
 
@@ -177,6 +301,7 @@ export class AuditsService {
     file: UploadedFile,
     clientId: string,
     capturedAt: string | undefined,
+    uploadedByName: string | null,
   ): Promise<Evidence> {
     const item = await this.item(itemId);
     await this.writableAudit(item.auditId);
@@ -202,6 +327,8 @@ export class AuditsService {
         sha256: sha256Hex(file.buffer),
         storageKey,
         mime: file.mimetype,
+        filename: decodeFilename(file.originalname),
+        uploadedByName,
         capturedAt: capturedAt ? new Date(capturedAt) : new Date(),
         clientId,
       });
@@ -215,12 +342,67 @@ export class AuditsService {
     return toEvidence(await repository.findOneByOrFail({ id }));
   }
 
+  async deleteEvidence(id: string): Promise<void> {
+    const evidence = await this.db
+      .getRepository(EvidenceEntity)
+      .findOneBy({ id });
+    if (!evidence) return;
+    if (evidence.auditItemId) {
+      const item = await this.item(evidence.auditItemId);
+      await this.writableAudit(item.auditId);
+    }
+    await this.db.getRepository(EvidenceEntity).delete({ id });
+    await this.storage.delete(evidence.storageKey);
+  }
+
   async evidenceUrl(id: string): Promise<string> {
     const evidence = await this.db
       .getRepository(EvidenceEntity)
       .findOneBy({ id });
     if (!evidence) throw new NotFoundException("Evidencia no encontrada.");
-    return this.storage.presignedGetUrl(evidence.storageKey);
+    return this.storage.presignedGetUrl(
+      evidence.storageKey,
+      evidence.filename ?? undefined,
+    );
+  }
+
+  private async addValidatedItems(
+    manager: EntityManager,
+    audit: AuditEntity,
+    excludedCategories: string[],
+  ): Promise<void> {
+    await manager.query(
+      `INSERT INTO audit_item (audit_id, obligation_version_id, position)
+       SELECT $1, v.id,
+              coalesce((SELECT max(position) FROM audit_item WHERE audit_id = $1), 0)
+                + row_number() OVER (ORDER BY o.category, o.key)
+       FROM obligation_version v
+       JOIN obligation o ON o.id = v.obligation_id
+       WHERE o.facility_id = $2
+         AND v.status = 'validated'
+         AND ($3::uuid IS NULL OR o.authority_id = $3)
+         AND NOT (o.category = ANY($4::text[]))
+       ON CONFLICT (audit_id, obligation_version_id) DO NOTHING`,
+      [audit.id, audit.facilityId, audit.authorityId, excludedCategories],
+    );
+  }
+
+  private async insertItem(
+    manager: EntityManager,
+    auditId: string,
+    obligationVersionId: string,
+  ): Promise<AuditItem> {
+    await manager.query(
+      `INSERT INTO audit_item (audit_id, obligation_version_id, position)
+       VALUES ($1, $2, coalesce((SELECT max(position) FROM audit_item WHERE audit_id = $1), 0) + 1)
+       ON CONFLICT (audit_id, obligation_version_id) DO NOTHING`,
+      [auditId, obligationVersionId],
+    );
+    const item = await manager
+      .getRepository(AuditItemEntity)
+      .findOneByOrFail({ auditId, obligationVersionId });
+    const [mapped] = await this.toItems([item]);
+    return mapped!;
   }
 
   private async audit(id: string): Promise<AuditEntity> {
@@ -264,8 +446,10 @@ export class AuditsService {
           auditId: item.auditId,
           obligationId: version.obligationId,
           version,
+          position: item.position,
           result: item.result,
           notes: item.notes,
+          naReason: item.naReason,
           assessedByName: item.assessedByName,
           assessedAt: item.assessedAt?.toISOString() ?? null,
           evidence: evidence
@@ -306,15 +490,25 @@ export class AuditsService {
     authorities: Map<string, AuthorityEntity>,
     counts: Record<AuditResult, number> | undefined,
   ): AuditSummary {
+    const authority = audit.authorityId
+      ? authorities.get(audit.authorityId)
+      : null;
     return {
       id: audit.id,
       facilityId: audit.facilityId,
-      authority: toAuthority(authorities.get(audit.authorityId)!),
+      title: audit.title,
+      authority: authority ? toAuthority(authority) : null,
       kind: audit.kind,
-      periodFrom: audit.periodFrom ?? "",
-      periodTo: audit.periodTo ?? "",
+      periodFrom: audit.periodFrom,
+      periodTo: audit.periodTo,
       plannedOn: audit.plannedOn ?? "",
       status: audit.status,
+      createdByName: audit.createdByName,
+      validatedByName: audit.validatedByName,
+      excludedCategories: audit.excludedCategories,
+      createdAt: audit.createdAt.toISOString(),
+      publishedAt: audit.publishedAt?.toISOString() ?? null,
+      closedAt: audit.closedAt?.toISOString() ?? null,
       itemCounts: counts ?? emptyCounts(),
     };
   }
@@ -327,15 +521,44 @@ function emptyCounts(): Record<AuditResult, number> {
   >;
 }
 
+function manualPreview(
+  auditId: string,
+  version: AuditItem["version"],
+): AuditItem {
+  return {
+    id: "",
+    auditId,
+    obligationId: version.obligationId,
+    version,
+    position: 0,
+    result: "pending",
+    notes: null,
+    naReason: null,
+    assessedByName: null,
+    assessedAt: null,
+    evidence: [],
+  };
+}
+
 function toEvidence(entity: EvidenceEntity): Evidence {
+  const fileUrl = `/api/evidence/${entity.id}/file`;
   return {
     id: entity.id,
     auditItemId: entity.auditItemId ?? "",
     obligationId: entity.obligationId,
     sha256: entity.sha256,
     mime: entity.mime,
+    filename: entity.filename,
+    uploadedByName: entity.uploadedByName,
+    fileUrl,
+    thumbUrl: entity.mime.startsWith("image/") ? fileUrl : null,
     capturedAt: (entity.capturedAt ?? entity.createdAt).toISOString(),
     clientId: entity.clientId,
     createdAt: entity.createdAt.toISOString(),
   };
+}
+
+function decodeFilename(name: string): string {
+  const decoded = Buffer.from(name, "latin1").toString("utf8");
+  return decoded.includes("�") ? name : decoded;
 }

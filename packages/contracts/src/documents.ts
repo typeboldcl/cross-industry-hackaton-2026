@@ -1,7 +1,7 @@
 import type { Authority } from "./facilities.js";
 
 export type DocumentKind =
-  "rca" | "rectificacion" | "pertinencia" | "res_sanitaria" | "norma";
+  "rca" | "rectificacion" | "pertinencia" | "res_sanitaria" | "norma" | "otro";
 
 export type DocumentProcessingStatus =
   "uploaded" | "queued" | "processing" | "done" | "failed";

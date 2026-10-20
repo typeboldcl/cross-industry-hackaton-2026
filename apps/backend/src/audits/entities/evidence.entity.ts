@@ -32,6 +32,12 @@ export class EvidenceEntity {
   @Column({ type: "text" })
   mime: string;
 
+  @Column({ type: "text", nullable: true })
+  filename: string | null;
+
+  @Column({ name: "uploaded_by_name", type: "text", nullable: true })
+  uploadedByName: string | null;
+
   @Column({ name: "captured_at", type: "timestamptz", nullable: true })
   capturedAt: Date | null;
 

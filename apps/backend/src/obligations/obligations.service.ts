@@ -71,6 +71,7 @@ export class ObligationsService {
       items.push({
         obligationId: obligation.id,
         key: obligation.key,
+        origin: obligation.origin,
         category: obligation.category,
         authority: toAuthority(authorities.get(obligation.authorityId)!),
         version: shown,
@@ -92,6 +93,7 @@ export class ObligationsService {
       id: obligation.id,
       facilityId: obligation.facilityId,
       key: obligation.key,
+      origin: obligation.origin,
       category: obligation.category,
       authority: toAuthority(authorities.get(obligation.authorityId)!),
       versions: await this.versionsOf([obligation.id]),
@@ -126,6 +128,7 @@ export class ObligationsService {
     for (const field of DRAFT_FIELDS) {
       if (changes[field] !== undefined) {
         Object.assign(version, { [field]: changes[field] });
+        version.edited = true;
       }
     }
     await repository.save(version);
@@ -167,10 +170,21 @@ export class ObligationsService {
     await this.db.transaction(async (manager) => {
       await this.lockDraft(manager, versionId);
       await manager.query(
-        `UPDATE obligation_version SET status = 'revoked' WHERE id = $1`,
+        `UPDATE obligation_version SET status = 'rejected' WHERE id = $1`,
         [versionId],
       );
     });
+    return this.version(versionId);
+  }
+
+  async restore(versionId: string): Promise<ObligationVersion> {
+    const [rows] = await this.db.query(
+      `UPDATE obligation_version SET status = 'draft' WHERE id = $1 AND status = 'rejected' RETURNING id`,
+      [versionId],
+    );
+    if (((rows as unknown[] | undefined)?.length ?? 0) === 0) {
+      throw new ConflictException("Solo se restaura un requisito descartado.");
+    }
     return this.version(versionId);
   }
 
@@ -305,6 +319,8 @@ function toVersion(
     dueDate: version.dueDate,
     dueRule: version.dueRule,
     attributes: version.attributes,
+    amendmentNote: version.amendmentNote,
+    edited: version.edited,
     status: version.status,
     validatedBy: version.validatedBy,
     validatedAt: version.validatedAt?.toISOString() ?? null,

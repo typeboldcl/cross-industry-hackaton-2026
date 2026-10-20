@@ -21,11 +21,17 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import type { Response } from "express";
-import { ActorName } from "../common/http/actor-name.decorator.js";
+import {
+  ActorName,
+  OptionalActorName,
+} from "../common/http/actor-name.decorator.js";
 import {
   AddAuditItemDto,
+  AddManualRequirementDto,
   AssessItemDto,
+  CategoryNotApplicableDto,
   CreateAuditDto,
+  PublishAuditDto,
   UploadEvidenceDto,
 } from "./audits.dto.js";
 import {
@@ -40,8 +46,11 @@ export class AuditsController {
   constructor(private readonly audits: AuditsService) {}
 
   @Post("audits")
-  create(@Body() body: CreateAuditDto): Promise<AuditDetail> {
-    return this.audits.create(body);
+  create(
+    @Body() body: CreateAuditDto,
+    @OptionalActorName() actor: string | null,
+  ): Promise<AuditDetail> {
+    return this.audits.create(body, actor);
   }
 
   @Get("facilities/:facilityId/audits")
@@ -56,12 +65,37 @@ export class AuditsController {
     return this.audits.detail(id);
   }
 
+  @Post("audits/:id/generate")
+  @HttpCode(200)
+  generate(@Param("id", ParseUUIDPipe) id: string): Promise<AuditDetail> {
+    return this.audits.generate(id);
+  }
+
+  @Post("audits/:id/publish")
+  @HttpCode(200)
+  publish(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: PublishAuditDto,
+    @ActorName() actor: string,
+  ): Promise<AuditDetail> {
+    return this.audits.publish(id, body.excludedCategories, actor);
+  }
+
   @Post("audits/:id/items")
   addItem(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() body: AddAuditItemDto,
   ): Promise<AuditItem> {
     return this.audits.addItem(id, body.obligationVersionId);
+  }
+
+  @Post("audits/:id/manual-requirements")
+  addManualRequirement(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: AddManualRequirementDto,
+    @ActorName() actor: string,
+  ): Promise<AuditItem> {
+    return this.audits.addManualRequirement(id, body, actor);
   }
 
   @Delete("audits/:id/items/:itemId")
@@ -82,6 +116,23 @@ export class AuditsController {
     return this.audits.assess(id, body, actor);
   }
 
+  @Post("audits/:id/categories/:category/not-applicable")
+  @HttpCode(200)
+  markCategoryNotApplicable(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("category") category: string,
+    @Body() body: CategoryNotApplicableDto,
+    @ActorName() actor: string,
+  ): Promise<AuditItem[]> {
+    return this.audits.markCategoryNotApplicable(
+      id,
+      category,
+      body.naReason,
+      body.notes ?? null,
+      actor,
+    );
+  }
+
   @Post("audits/:id/close")
   @HttpCode(200)
   close(@Param("id", ParseUUIDPipe) id: string): Promise<AuditDetail> {
@@ -96,6 +147,7 @@ export class AuditsController {
     @Param("id", ParseUUIDPipe) id: string,
     @UploadedFile() file: Upload | undefined,
     @Body() body: UploadEvidenceDto,
+    @OptionalActorName() actor: string | null,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Evidence> {
     const replay = await this.audits.findEvidenceByClientId(body.clientId);
@@ -106,7 +158,19 @@ export class AuditsController {
     if (!file) {
       throw new BadRequestException("Adjunta la evidencia en el campo «file».");
     }
-    return this.audits.uploadEvidence(id, file, body.clientId, body.capturedAt);
+    return this.audits.uploadEvidence(
+      id,
+      file,
+      body.clientId,
+      body.capturedAt,
+      actor,
+    );
+  }
+
+  @Delete("evidence/:id")
+  @HttpCode(204)
+  deleteEvidence(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
+    return this.audits.deleteEvidence(id);
   }
 
   @Get("evidence/:id/file")

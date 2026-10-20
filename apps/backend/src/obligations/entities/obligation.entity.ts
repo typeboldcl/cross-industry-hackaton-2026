@@ -1,3 +1,4 @@
+import type { ObligationOrigin } from "@hackaton/contracts";
 import {
   Column,
   CreateDateColumn,
@@ -19,6 +20,9 @@ export class ObligationEntity {
 
   @Column({ name: "authority_id", type: "uuid" })
   authorityId: string;
+
+  @Column({ type: "text", default: "extracted" })
+  origin: ObligationOrigin;
 
   @Column({ type: "text" })
   category: string;

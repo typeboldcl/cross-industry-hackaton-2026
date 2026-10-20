@@ -49,6 +49,12 @@ export class ObligationVersionEntity {
   @Column({ type: "jsonb", default: () => "'{}'" })
   attributes: Record<string, unknown>;
 
+  @Column({ name: "amendment_note", type: "text", nullable: true })
+  amendmentNote: string | null;
+
+  @Column({ type: "boolean", default: false })
+  edited: boolean;
+
   @Column({ type: "text", default: "draft" })
   status: ObligationStatus;
 

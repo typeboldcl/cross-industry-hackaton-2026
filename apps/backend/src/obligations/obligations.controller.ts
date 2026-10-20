@@ -64,6 +64,15 @@ export class ObligationsController {
     return this.obligations.validate(id, actor);
   }
 
+  @Post("obligation-versions/:id/restore")
+  @HttpCode(200)
+  restore(
+    @Param("id", ParseUUIDPipe) id: string,
+    @ActorName() _actor: string,
+  ): Promise<ObligationVersion> {
+    return this.obligations.restore(id);
+  }
+
   @Post("obligation-versions/:id/reject")
   @HttpCode(200)
   reject(

@@ -8,13 +8,12 @@ import {
   useLocation,
   useParams,
 } from "react-router";
-import { ChatFab, ChatSheet } from "./components/Chat";
+import { useAudit } from "./api";
 import { Icon } from "./components/Icon";
 import { ConfirmDialog, Toaster } from "./components/Overlays";
 import { TopBar } from "./components/TopBar";
 import { STATUS } from "./domain/constants";
 import { type AuditCtx, useAuditCtx } from "./hooks/useAuditCtx";
-import { useAudit, useAuditStore } from "./store/useAuditStore";
 import { Centro } from "./views/Centro";
 import { Inicio } from "./views/Inicio";
 import { Nueva } from "./views/Nueva";
@@ -44,12 +43,10 @@ function RootLayout() {
 
 const navCls = ({ isActive }: { isActive: boolean }) => (isActive ? "on" : "");
 
-/** Dentro de una auditoría: barra de navegación y chat de normativa. */
+/** Dentro de una auditoría: barra de navegación. */
 function AuditLayout() {
   const { auditId } = useParams();
   const audit = useAudit(auditId);
-  const adding = useAuditStore((s) => s.adding);
-  const { pathname } = useLocation();
 
   // La barra solo aparece dentro de una auditoría: antes no se sabe a cuál se entra.
   useEffect(() => {
@@ -58,7 +55,6 @@ function AuditLayout() {
   }, []);
 
   if (!audit) return <Navigate to="/" replace />;
-  const enPreparar = pathname.endsWith("/preparar");
 
   return (
     <>
@@ -77,8 +73,6 @@ function AuditLayout() {
         </NavLink>
       </nav>
       <Outlet context={{ audit } satisfies AuditCtx} />
-      <ChatFab hidden={pathname.endsWith("/panel") || (enPreparar && adding)} />
-      <ChatSheet auditId={audit.id} />
     </>
   );
 }

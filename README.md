@@ -1,11 +1,11 @@
 # cross-industry-hackaton-2026
 
-pnpm workspace: apps live in `apps/`, shared code in `packages/`.
+pnpm workspace: apps live in `apps/`, shared code in `packages/`. Coding agents: start with [`AGENTS.md`](AGENTS.md).
 
 | Path                 | Package               | What                             |
 | -------------------- | --------------------- | -------------------------------- |
 | `apps/backend`       | `hackaton-backend`    | NestJS API, served under `/api`  |
-| `apps/frontend`      | —                     | Static HTML prototype (no build) |
+| `apps/frontend`      | `hackaton-frontend`   | React app (Vite)                 |
 | `packages/contracts` | `@hackaton/contracts` | HTTP contract types (types only) |
 
 ## Requirements

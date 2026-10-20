@@ -937,31 +937,6 @@ textarea.need {
   padding: 4px 0;
   white-space: nowrap;
 }
-.fab {
-  position: fixed;
-  right: 16px;
-  bottom: 96px;
-  z-index: 25;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: 0;
-  background: var(--primary);
-  color: var(--primary-ink);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  display: grid;
-  place-items: center;
-}
-.fab svg {
-  width: 26px;
-  height: 26px;
-}
-@media (min-width: 1000px) {
-  .fab {
-    bottom: 24px;
-    right: 24px;
-  }
-}
 /* Detalle */
 .status-grid {
   display: grid;
@@ -1119,7 +1094,7 @@ textarea.need {
   border-radius: 3px;
   display: inline-block;
 }
-/* Chat */
+/* Fondo de los diálogos de confirmación */
 .sheet-bg {
   position: fixed;
   inset: 0;
@@ -1128,75 +1103,6 @@ textarea.need {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-}
-.sheet {
-  background: var(--surface);
-  width: 100%;
-  max-width: 560px;
-  height: 82vh;
-  border-radius: 18px 18px 0 0;
-  display: flex;
-  flex-direction: column;
-}
-@media (min-width: 700px) {
-  .sheet-bg {
-    align-items: center;
-  }
-  .sheet {
-    border-radius: 18px;
-    height: 640px;
-  }
-}
-.sheet header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-}
-.msgs {
-  flex: 1;
-  overflow: auto;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.msg {
-  max-width: 86%;
-  padding: 10px 12px;
-  border-radius: 14px;
-  font-size: 14px;
-  white-space: pre-wrap;
-}
-.msg.me {
-  align-self: flex-end;
-  background: var(--primary);
-  color: var(--primary-ink);
-  border-bottom-right-radius: 4px;
-}
-.msg.bot {
-  align-self: flex-start;
-  background: var(--surface-2);
-  border-bottom-left-radius: 4px;
-}
-.msg .src {
-  margin-top: 6px;
-}
-.chat-in {
-  display: flex;
-  gap: 8px;
-  padding: 12px;
-  border-top: 1px solid var(--border);
-}
-.sugs {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding: 0 12px 10px;
-}
-.sugs button {
-  white-space: nowrap;
 }
 .crumb {
   display: inline-flex;

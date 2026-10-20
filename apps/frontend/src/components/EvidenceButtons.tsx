@@ -1,6 +1,5 @@
 import { useRef } from "react";
-import { toEvidencia } from "../domain/evidencia";
-import { useAuditStore } from "../store/useAuditStore";
+import { api, run } from "../api";
 import { Icon } from "./Icon";
 
 /** "Tomar foto" (abre la cámara en el celular) y "Adjuntar" para un requisito. */
@@ -13,13 +12,12 @@ export function EvidenceButtons({
   rid: string;
   small?: boolean;
 }) {
-  const addEvidence = useAuditStore((s) => s.addEvidence);
   const photo = useRef<HTMLInputElement>(null);
   const any = useRef<HTMLInputElement>(null);
   const onFile = async (input: HTMLInputElement) => {
     const f = input.files?.[0];
     input.value = "";
-    if (f) addEvidence(aid, rid, await toEvidencia(f));
+    if (f) await run(api.evidence.upload(aid, rid, f));
   };
   const size = small ? 16 : 18;
   const cls = small ? "btn sm" : "btn grow";

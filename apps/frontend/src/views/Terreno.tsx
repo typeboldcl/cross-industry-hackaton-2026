@@ -30,16 +30,23 @@ import {
 } from "../domain/constants";
 import { fmtDate, pctLabel, plural } from "../domain/format";
 import { useAuditCtx } from "../hooks/useAuditCtx";
-import { type Tab, type Undo, useAuditStore } from "../store/useAuditStore";
-import { askConfirm, toast } from "../store/useUiStore";
+import { api, attempt, run, type Undo } from "../api";
+import { askConfirm, type Tab, toast, useUiStore } from "../store/useUiStore";
 
-/** Aviso con "Deshacer" tras marcar desde la lista. */
-function avisar(estado: string, r: Requisito, undo: Undo) {
+/** Aviso con "Deshacer" (5 s) después de un cambio en terreno. */
+function conDeshacer(msg: string, undo: Undo) {
+  toast(
+    msg,
+    () => void attempt(undo()).then((ok) => ok && toast("Cambio deshecho")),
+  );
+}
+
+/** Marca un requisito desde la lista y ofrece deshacerlo. */
+async function evaluar(estado: string, r: Requisito, call: Promise<Undo>) {
+  const undo = await run(call);
+  if (!undo) return;
   const t = r.titulo.length > 28 ? `${r.titulo.slice(0, 28)}…` : r.titulo;
-  toast(`${estado} · ${t}`, () => {
-    undo();
-    toast("Cambio deshecho");
-  });
+  conDeshacer(`${estado} · ${t}`, undo);
 }
 
 /** Panel abierto bajo una fila: motivo de N/A o nota de No cumple. */
@@ -48,7 +55,7 @@ type Picker = { id: string; tipo: "na" | "nota" } | null;
 export function Terreno() {
   const a = useAuditCtx();
   const navigate = useNavigate();
-  const { tab, q, setTab, setQ, setStep, setAdding } = useAuditStore();
+  const { tab, q, setTab, setQ, setAdding } = useUiStore();
   const [picker, setPicker] = useState<Picker>(null);
   const filters = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -169,11 +176,13 @@ export function Terreno() {
       {!closed && (
         <button
           className="btn block"
-          onClick={() => {
-            setStep(a.id, 4);
-            setAdding(true);
-            void navigate("../preparar");
-          }}
+          onClick={() =>
+            void attempt(api.audits.setStep(a.id, 4)).then((ok) => {
+              if (!ok) return;
+              setAdding(true);
+              void navigate("../preparar");
+            })
+          }
         >
           + Agregar requisito encontrado en terreno
         </button>
@@ -195,7 +204,6 @@ function Lista({
   picker: Picker;
   setPicker: (p: Picker) => void;
 }) {
-  const temaNA = useAuditStore((s) => s.temaNA);
   const ro = a.status === "cerrada";
   const num = numeracion(a);
   const needle = q.trim().toLowerCase();
@@ -253,13 +261,15 @@ function Lista({
                   titulo: `¿“${t}” no aplica?`,
                   texto: `Se marcarán ${pend} requisitos pendientes como No aplica, con el motivo “${NA_MOTIVOS[0]}”. Podrás cambiar cada uno después.`,
                   ok: "Marcar No aplica",
-                  onOk: () => {
-                    const { count, undo } = temaNA(a.id, t);
-                    toast(`${count} requisitos marcados No aplica`, () => {
-                      undo();
-                      toast("Cambio deshecho");
-                    });
-                  },
+                  onOk: () =>
+                    void run(api.items.categoryNotApplicable(a.id, t)).then(
+                      (res) =>
+                        res &&
+                        conDeshacer(
+                          `${res.count} requisitos marcados No aplica`,
+                          res.undo,
+                        ),
+                    ),
                 });
               }}
             >
@@ -355,7 +365,6 @@ function FilaPendiente({
   setPicker: (p: Picker) => void;
 }) {
   const navigate = useNavigate();
-  const marcar = useAuditStore((s) => s.marcar);
   const extra = [
     r.frecuencia,
     docById(r.fuente.doc, a).tipo,
@@ -366,7 +375,11 @@ function FilaPendiente({
 
   const tocar = (k: EstadoMarcable) => {
     if (k === "cumple") {
-      avisar(ESTADOS.cumple, r, marcar(a.id, r.id, "cumple"));
+      void evaluar(
+        ESTADOS.cumple,
+        r,
+        api.items.assess(a.id, r.id, { estado: "cumple" }),
+      );
       return;
     }
     const tipo = k === "na" ? "na" : "nota";
@@ -375,13 +388,16 @@ function FilaPendiente({
 
   const elegirMotivo = (m: string) => {
     setPicker(null);
+    const call = api.items.assess(a.id, r.id, { estado: "na", naMotivo: m });
     if (m === NA_OTRO) {
-      marcar(a.id, r.id, "na", { naMotivo: m });
-      toast("Describe el motivo en la observación");
-      void navigate(r.id, { state: { focoObs: true } });
+      void attempt(call).then((ok) => {
+        if (!ok) return;
+        toast("Describe el motivo en la observación");
+        void navigate(r.id, { state: { focoObs: true } });
+      });
       return;
     }
-    avisar(ESTADOS.na, r, marcar(a.id, r.id, "na", { naMotivo: m }));
+    void evaluar(ESTADOS.na, r, call);
   };
 
   return (
@@ -454,7 +470,6 @@ function NotaNoCumple({
   r: Requisito;
   onClose: () => void;
 }) {
-  const marcar = useAuditStore((s) => s.marcar);
   const [nota, setNota] = useState(r.obs);
   const [need, setNeed] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -472,7 +487,11 @@ function NotaNoCumple({
       return;
     }
     onClose();
-    avisar(ESTADOS.no_cumple, r, marcar(a.id, r.id, "no_cumple", { obs: t }));
+    void evaluar(
+      ESTADOS.no_cumple,
+      r,
+      api.items.assess(a.id, r.id, { estado: "no_cumple", obs: t }),
+    );
   };
 
   return (

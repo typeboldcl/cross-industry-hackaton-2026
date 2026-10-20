@@ -193,7 +193,10 @@ function addObligation(
           },
         ]
       : [],
-    createdAt: at,
+    // La extracción propone el requisito antes de que alguien lo valide.
+    createdAt: validatedBy
+      ? new Date(Date.parse(at) - 3_600_000).toISOString()
+      : at,
   };
   db.obligations.push(obligation);
   db.versions.push(version);

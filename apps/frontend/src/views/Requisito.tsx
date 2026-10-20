@@ -32,6 +32,8 @@ function Detalle({ itemId }: { itemId?: string }) {
   const item = a.items.find((x) => x.id === itemId);
   const [notes, setNotes] = useState(item?.notes ?? "");
   const [need, setNeed] = useState(!!state?.focoObs);
+  // Tocó "No aplica" y está eligiendo el motivo (aún no se guarda).
+  const [pickNa, setPickNa] = useState(!!state?.naReason);
   // Motivo de N/A elegido y aún no guardado ("Otro motivo" necesita la nota).
   const [naChoice, setNaChoice] = useState<NaReason | null>(
     state?.naReason ?? null,
@@ -50,9 +52,13 @@ function Detalle({ itemId }: { itemId?: string }) {
   const code = numberItems(a.items, categoryLookup(obligations)).rows.find(
     (r) => r.item.id === item.id,
   )?.code;
-  const showNa = item.result === "not_applicable" || naChoice !== null;
+  const showNa = item.result === "not_applicable" || pickNa;
   const reason = naChoice ?? item.naReason;
   const obligatoria = item.result === "non_compliant" || reason === "other";
+  // Eligió "Otro motivo" pero aún no lo guarda: falta escribir la explicación.
+  const otroPendiente =
+    naChoice === "other" &&
+    !(item.result === "not_applicable" && item.naReason === "other");
 
   const assess = (req: Parameters<typeof actions.assess>[3], ok: string) =>
     void attempt(actions.assess(a.id, a.facilityId, item, req)).then((done) => {
@@ -65,10 +71,12 @@ function Detalle({ itemId }: { itemId?: string }) {
       return;
     }
     if (k === "not_applicable") {
+      setPickNa(true);
       setNaChoice(item.naReason ?? null);
       toast("Elige el motivo de No aplica");
       return;
     }
+    setPickNa(false);
     setNaChoice(null);
     if (k === "non_compliant" && !notes.trim()) {
       toast("Para marcar No cumple escribe primero la observación");
@@ -145,7 +153,7 @@ function Detalle({ itemId }: { itemId?: string }) {
         {MARKABLE.map((k) => (
           <button
             key={k}
-            className={`st ${RESULT_CSS[k]} ${item.result === k || (k === "not_applicable" && naChoice) ? "on" : ""}`}
+            className={`st ${RESULT_CSS[k]} ${(pickNa ? "not_applicable" : item.result) === k ? "on" : ""}`}
             disabled={ro}
             onClick={() => elegir(k)}
           >
@@ -196,6 +204,14 @@ function Detalle({ itemId }: { itemId?: string }) {
         }}
         onBlur={guardarObs}
       />
+      {otroPendiente && !ro && (
+        <button
+          className="btn primary block"
+          onClick={() => elegirMotivo("other")}
+        >
+          Guardar No aplica (Otro motivo)
+        </button>
+      )}
       <div className="sec-title">Evidencias</div>
       {v.expectedEvidence && (
         <div className="small muted" style={{ margin: "-4px 2px 8px" }}>

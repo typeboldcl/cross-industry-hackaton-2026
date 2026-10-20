@@ -21,9 +21,10 @@ Team split: Josué builds the frontend, Adriel the document loading and LLM extr
 
 pnpm workspace, Node >= 24, pnpm 12 (`corepack enable`).
 
-- `apps/frontend` (`hackaton-frontend`): React 19 + Vite + TypeScript app. Zustand stores with Immer, React Router (hash router), Vitest, oxlint. This is where UI work happens.
+- `apps/frontend` (`hackaton-frontend`): React 19 + Vite + TypeScript app. TanStack Query for server data, Zustand for UI state, React Router (hash router), Vitest, oxlint. This is where UI work happens.
 - `apps/frontend/prototipo/`: the original single-file HTML prototype and `SISTEMA.md`. It is the **reference for the agreed flow**. Do not change it unless asked; it is excluded from Prettier.
-- `apps/backend` (`hackaton-backend`): NestJS API under `/api`. Only a health endpoint so far.
+- `apps/backend` (`hackaton-backend`): NestJS API under `/api` (facilities, documents, obligations, audits, evidence, SEIA, Q&A) on Postgres, OBS and Orbit. Needs `apps/backend/.env` (see `.env.example`).
+- `deploy/`: Huawei CCE manifests; the frontend and backend share one ingress (`/` and `/api`).
 - `packages/contracts` (`@hackaton/contracts`): types shared by frontend and backend. **Types only**: import with `import type`, never add runtime code.
 
 Commands, from the repo root:
@@ -41,27 +42,29 @@ Run that last line before saying a change is done. If Node or pnpm is not availa
 
 - `src/App.tsx`: routes. The open audit lives in the URL (`#/auditorias/:auditId/terreno`), so every screen is linkable.
 - `src/views/`: one file per screen (Inicio = centros, Centro, Nueva, Preparar, Terreno, Requisito, Panel).
-- `src/api/`: the only way screens read and change data (`api.*`, `useAudits`, `useAudit`). `localApi` implements it on the local store; an HTTP implementation will replace it. Screens must not import the stores' data actions directly.
-- `src/domain/`: pure logic (stats, sheet numbering, factories, evidence). Keep it free of React so it stays testable; tests live next to it (`*.spec.ts`).
-- `src/store/useAuditStore.ts`: persisted local data (`localStorage` key `auditorias-react-v1`), used only by `src/api/`. `useUiStore.ts`: toasts, dialogs and Terreno filters.
-- `src/data/seed.ts`: example installations, the Piscicultura Aucha documents and `REQ_TEMPLATES`, the 35 requirements extracted by hand.
+- `src/api/`: the only way screens read and change data: query hooks (`useFacilities`, `useFacilityContext`, `useObligations`, `useAudit`) and `actions.*`, which call the API and refresh the cache. Two backends implement the same `AuditApi`: `httpApi` (the real one, `VITE_API_URL`, default `/api`, sends `X-Actor-Name`) and `demo/demoApi` (in-browser, same contracts and rules, stored in `localStorage`). Keep both in step when the backend changes.
+- `src/domain/`: pure logic (labels in Spanish for the backend enums, stats, sheet numbering, evidence thumbnails). Keep it free of React so it stays testable; tests live next to it (`*.spec.ts`).
+- `src/store/useSession.ts`: the auditor's name and Demo/Backend mode (persisted). `useUiStore.ts`: toasts, dialogs, Terreno filters, wizard step and excluded themes.
+- `src/data/seed.ts`: demo data only: example installations, the Piscicultura Aucha documents and `REQ_TEMPLATES`, the 35 requirements extracted by hand.
 - `src/styles.css`: Invermar palette (navy `#03215C`, accent `#00BBFF`, primary `#0072B2`). Light theme by default, dark theme only when the user picks it.
 
 ## Domain rules (do not break these)
 
-- Audit status: `sin_preparar` → `en_validacion` → `publicada` → `cerrada`. Closed audits are read-only.
-- Requirement validation (`val`): `propuesto`, `validado`, `descartado`, `fuera` (its theme was excluded). Only `validado` requirements reach the site checklist.
-- On-site status matches Invermar's paper sheet (SÍ / NO / N/A): `pendiente`, `cumple`, `no_cumple`, `na`. There is no "parcial".
-- `no_cumple` requires a non-empty note. Evidence is optional. `na` requires a reason (`naMotivo`).
-- Compliance = cumple / (cumple + no_cumple); N/A does not count. Colours: >= 85 % green, >= 65 % amber, below that red.
-- Requirements are numbered like the paper sheet (1-a, 1-b…) from their original order, so codes never change when filtering.
-- Every change appends to the requirement's history (`hist`: date, action, who). Traceability is a core selling point.
-- Manually added requirements are flagged `manual: true`, and their source can be `"MANUAL"` (criterio del responsable).
+The types live in `packages/contracts` (`audits.ts`, `obligations.ts`, `documents.ts`, `context.ts`); the backend enforces these rules and `demoApi` mirrors them.
+
+- Audit status: `draft` → `in_validation` → `published` → `closed`. Closed audits are read-only.
+- Requirements (obligations) are validated **per installation**, not per audit: `obligation_version.status` is `draft`, `validated`, `rejected` (plus `superseded`, `revoked`). Publishing an audit creates one item per validated requirement whose theme is not excluded. Only validated requirements reach the site checklist.
+- On-site result matches Invermar's paper sheet (SÍ / NO / N/A): `pending`, `compliant`, `non_compliant`, `not_applicable`. There is no "parcial". The UI shows them in Spanish (`src/domain/labels.ts`).
+- `non_compliant` requires a note. Evidence is optional. `not_applicable` requires a `naReason`; `other` also requires a note.
+- Compliance = compliant / (compliant + non_compliant); N/A does not count. Colours: >= 85 % green, >= 65 % amber, below that red.
+- Requirements are numbered like the paper sheet (1-a, 1-b…) from the item `position`, so codes never change when filtering.
+- Each item carries its `history` (built by the backend from each step). Traceability is a core selling point.
+- Manual requirements have `origin: "manual"` and no source document (criterio del responsable).
 - There is no chat: the team decided not to include the regulations chatbot. The HTML prototype still has it only as a historical reference.
 
 ## The extraction contract
 
-`RequisitoExtraido` in `packages/contracts/src/auditoria.ts` is what the LLM extraction must return for each obligation found: `{ id, tema, titulo, detalle, fuente: { doc, ref }, frecuencia, evidencia, venc?, rectificado? }`. Keep the frontend, the backend and `REQ_TEMPLATES` aligned with that type. If it has to change, change it in `contracts` first.
+Extraction runs in the backend when a document is uploaded: it proposes `ObligationVersion` drafts with their `sources` (document, section, page, quote). `RequisitoExtraido` in `contracts/src/auditoria.ts` is the older shape the prototype used; the frontend no longer depends on it. If an API shape has to change, change it in `contracts` first.
 
 Beyond the list, extraction should also:
 
@@ -71,12 +74,13 @@ Beyond the list, extraction should also:
 
 ## What is mocked today
 
-- "Generar requisitos" loads `REQ_TEMPLATES` instead of calling an LLM.
-- Uploading a document only records its file name.
-- Persistence is browser `localStorage`. Sync is simulated (evidence is marked synced 1.5 s after the last change while online).
-- Only Piscicultura Aucha has real documents. The other two installations use made-up numbers. Most due dates are examples, except the SUSPEL declaration (20 December), which comes from the resolution.
+Only in **demo mode** (`src/api/demo`):
 
-Likely next steps: backend endpoints for audits and extraction (typed in `contracts`), replace `REQ_TEMPLATES` with the real extraction, real offline sync (Service Worker + IndexedDB + queue), roles (cumplimiento, centro, gerencia).
+- "Generar requisitos" creates Aucha's 35 drafts from `REQ_TEMPLATES` the first time, as if its documents had been processed.
+- Uploading a document only records its name; SEIA pertinencias are fixed.
+- Only Piscicultura Aucha has real documents; the other two installations start empty. Most due dates are examples, except the SUSPEL declaration (20 December), which comes from the resolution.
+
+Not built yet: offline work against the real backend (Service Worker + IndexedDB + queue), roles (cumplimiento, centro, gerencia), and a full change log (`audit_log`; today's history is derived).
 
 ## Data and privacy
 

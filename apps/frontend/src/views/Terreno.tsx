@@ -395,7 +395,7 @@ function FilaPendiente({
     setPicker(null);
     if (m === "other") {
       // "Otro motivo" exige explicación: se completa en el detalle.
-      toast("Describe el motivo en la observación y elige «Otro motivo»");
+      toast("Describe el motivo y toca «Guardar No aplica»");
       void navigate(item.id, { state: { focoObs: true, naReason: "other" } });
       return;
     }

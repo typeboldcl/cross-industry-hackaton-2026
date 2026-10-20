@@ -58,7 +58,8 @@ export interface DemoAudit {
   clientId: string | null;
 }
 
-export type DemoItem = Omit<AuditItem, "version" | "evidence"> & {
+/** `version`, `evidence` e `history` se arman al responder. */
+export type DemoItem = Omit<AuditItem, "version" | "evidence" | "history"> & {
   versionId: string;
 };
 

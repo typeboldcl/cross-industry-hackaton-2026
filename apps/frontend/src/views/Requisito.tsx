@@ -296,50 +296,30 @@ function Detalle({ itemId }: { itemId?: string }) {
   );
 }
 
+/** El backend escribe el motivo de N/A como código; aquí se muestra en español. */
+const legible = (summary: string) =>
+  NA_REASONS.reduce((s, r) => s.replace(r, NA_REASON_LABEL[r]), summary);
+
 /**
- * Línea de tiempo con lo que ya entrega el backend. El endpoint de historial
- * completo está en desarrollo; cuando exista, se reemplaza esta función.
+ * Historial que arma el backend con lo que registra cada paso (propuesto,
+ * validado, publicado, evidencias, resultado). Lo más reciente arriba.
  */
 function Historial({ item }: { item: AuditItem }) {
-  const v = item.version;
-  const events = [
-    { at: v.createdAt, what: "Requisito propuesto", who: "Sistema" },
-    v.validatedAt && {
-      at: v.validatedAt,
-      what: "Validado",
-      who: v.validatedBy ?? "",
-    },
-    ...item.evidence.map((e) => ({
-      at: e.createdAt,
-      what: `Evidencia agregada: ${e.filename ?? "archivo"}`,
-      who: e.uploadedByName ?? "",
-    })),
-    item.assessedAt && {
-      at: item.assessedAt,
-      what: `Marcado como “${RESULT_LABEL[item.result]}”`,
-      who: item.assessedByName ?? "",
-    },
-  ]
-    .filter((e): e is { at: string; what: string; who: string } => !!e)
-    .sort((x, y) => y.at.localeCompare(x.at));
+  const entries = [...(item.history ?? [])].sort((x, y) =>
+    y.at.localeCompare(x.at),
+  );
+  if (!entries.length) return <div className="small muted">Sin registros.</div>;
   return (
-    <>
-      <div className="hist">
-        {events.map((e, i) => (
-          <div key={i}>
-            <b>{e.what}</b>
-            <br />
-            <span className="muted xs">
-              {new Date(e.at).toLocaleString("es-CL")}
-              {e.who ? ` · ${e.who}` : ""}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="xs muted">
-        El historial completo de cambios llegará con el próximo endpoint del
-        backend.
-      </div>
-    </>
+    <div className="hist">
+      {entries.map((e, i) => (
+        <div key={i}>
+          <b>{legible(e.summary)}</b>
+          <br />
+          <span className="muted xs">
+            {new Date(e.at).toLocaleString("es-CL")} · {e.actorName}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }

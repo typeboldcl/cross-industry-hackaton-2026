@@ -12,8 +12,13 @@ interface Session {
   setApiMode: (mode: ApiMode) => void;
 }
 
-/** Sin `VITE_API_URL` configurada no hay backend al que apuntar: parte en demo. */
-const defaultMode: ApiMode = import.meta.env.VITE_API_URL ? "http" : "demo";
+/**
+ * Desplegada (CCE), la app y el backend comparten dominio (`/api`), así que
+ * parte conectada. En desarrollo parte en demo, salvo que `VITE_API_URL`
+ * apunte a un backend.
+ */
+const defaultMode: ApiMode =
+  import.meta.env.PROD || import.meta.env.VITE_API_URL ? "http" : "demo";
 
 /** Preferencias de este dispositivo. No van a la API. */
 export const useSession = create<Session>()(

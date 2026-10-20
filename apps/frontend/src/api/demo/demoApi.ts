@@ -4,6 +4,7 @@ import type {
   AuditResult,
   AuditSummary,
   FacilityListItem,
+  HistoryEntry,
   ObligationListItem,
   ObligationVersion,
 } from "@hackaton/contracts";
@@ -82,11 +83,72 @@ function summary(d: DemoDb, a: DemoAudit): AuditSummary {
 
 function toItem(d: DemoDb, i: DemoItem): AuditItem {
   const { versionId, ...rest } = i;
+  const version = d.versions.find((v) => v.id === versionId)!;
+  const evidence = d.evidence.filter((e) => e.auditItemId === i.id);
   return {
     ...rest,
-    version: d.versions.find((v) => v.id === versionId)!,
-    evidence: d.evidence.filter((e) => e.auditItemId === i.id),
+    version,
+    evidence,
+    history: historyOf(d, i, version, evidence),
   };
+}
+
+const RESULT_TEXT: Record<AuditResult, string> = {
+  compliant: "Cumple",
+  non_compliant: "No cumple",
+  not_applicable: "No aplica",
+  pending: "Pendiente",
+};
+
+/** Igual que `historyOf` del backend: se arma con lo que registra cada paso. */
+function historyOf(
+  d: DemoDb,
+  i: DemoItem,
+  v: ObligationVersion,
+  evidence: AuditItem["evidence"],
+): HistoryEntry[] {
+  const manual =
+    d.obligations.find((o) => o.id === v.obligationId)?.origin === "manual";
+  const audit = d.audits.find((a) => a.id === i.auditId);
+  const entries: HistoryEntry[] = [
+    {
+      at: v.createdAt,
+      actorName: manual ? (v.validatedBy ?? "Responsable") : "Sistema",
+      summary: manual
+        ? "Agregado manualmente"
+        : "Propuesto por la extracción del documento",
+    },
+  ];
+  if (v.validatedAt) {
+    entries.push({
+      at: v.validatedAt,
+      actorName: v.validatedBy ?? "Responsable",
+      summary: v.edited ? "Editado y validado" : "Validado",
+    });
+  }
+  if (audit?.publishedAt) {
+    entries.push({
+      at: audit.publishedAt,
+      actorName: audit.validatedByName ?? "Responsable",
+      summary: `Incluido en «${audit.title}»`,
+    });
+  }
+  for (const e of evidence) {
+    entries.push({
+      at: e.createdAt,
+      actorName: e.uploadedByName ?? "Equipo en terreno",
+      summary: `Evidencia agregada: ${e.filename ?? "archivo"}`,
+    });
+  }
+  if (i.assessedAt && i.result !== "pending") {
+    const detail = i.result === "not_applicable" ? i.naReason : i.notes;
+    entries.push({
+      at: i.assessedAt,
+      actorName: i.assessedByName ?? "Equipo en terreno",
+      summary: `Marcado como «${RESULT_TEXT[i.result]}»${detail ? `: ${detail}` : ""}`,
+    });
+  }
+  return entries.sort((a, b) => a.at.localeCompare(b.at));
 }
 
 function detail(d: DemoDb, id: string): AuditDetail {

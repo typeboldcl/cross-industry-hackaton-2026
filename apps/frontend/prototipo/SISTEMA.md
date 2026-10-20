@@ -2,7 +2,7 @@
 
 Documento de funcionamiento y composición del prototipo de frontend para el **Reto 4 · Automatización de auditorías ambientales y de permisos por instalación** (Invermar · Hackatón).
 
-- Archivo del prototipo: `apps/frontend/prototipo/index.html` (un solo archivo HTML + CSS + JavaScript, sin dependencias).
+- Archivo del prototipo: `apps/frontend/prototipo/index.html` (un solo archivo HTML + CSS + JavaScript, sin dependencias) más el logo en `assets/invermar-logo.png`. La fuente Montserrat se carga desde Google Fonts; sin conexión se usa la fuente del sistema.
 - Estado: prototipo navegable con datos reales extraídos de los documentos del reto. La extracción con LLM, el backend y la sincronización real están **simulados**.
 
 ---
@@ -77,9 +77,13 @@ Centro (instalación)
 
 Pestañas:
 
-- **Todos** (por defecto): todos los requisitos, con y sin estado. Dentro de cada temática, los pendientes van primero y los ya marcados bajan al final. El contador de la temática muestra marcados/total.
+- **Todos** (por defecto): todos los requisitos, con y sin estado. Dentro de cada temática se agrupan por estado: primero los pendientes, luego Cumple, luego No cumple y al final N/A. El contador de la temática muestra marcados/total.
 - **Llenados:** solo los que tienen estado.
 - **Pendientes:** solo los que faltan.
+
+El buscador y las pestañas quedan **fijos bajo la barra superior** al bajar por la lista, para filtrar sin volver arriba. Al cambiar de pestaña con la lista bajada, se vuelve al inicio de la lista.
+
+**Numeración como la planilla en papel:** cada temática lleva un número (1, 2, 3…) y cada ítem un código (1-a, 1-b…). Se calcula sobre todos los requisitos validados en su orden original, así que el código de un ítem no cambia al filtrar, buscar o marcarlo. Se ve en la lista y en el detalle. Dentro de cada grupo de estado se respeta ese orden.
 
 Un requisito **ya marcado** se ve como un recuadro del color de su estado, con la etiqueta, la nota o el motivo de N/A, y sin botones. Para corregirlo se toca el recuadro y se cambia en el detalle.
 
@@ -95,7 +99,7 @@ Cada requisito **pendiente** tiene los botones **Cumple · No cumple · N/A**, a
 
 Elementos globales:
 
-- **Barra superior:** centro y auditoría abierta, indicador de conexión ("En línea", "Sin conexión · N por sincronizar") y botón de tema claro/oscuro (por defecto claro; la elección se recuerda).
+- **Barra superior:** logo de Invermar (lleva a Centros), centro y auditoría abierta, indicador de conexión ("En línea", "Sin conexión · N por sincronizar") y botón de tema claro/oscuro (por defecto claro; la elección se recuerda).
 - **Navegación:** solo aparece **dentro de una auditoría** (Preparar, Terreno, Detalle y Panel): Auditorías (vuelve a las auditorías del centro) · Terreno · Panel. Es una barra inferior en celular y lateral en escritorio. En Centros, Auditorías del centro y Crear nueva auditoría no hay barra, porque todavía no se sabe a qué auditoría se entra. A Preparar se llega desde la tarjeta de la auditoría ("Continuar preparación" o "Validar requisitos").
 - **Chat de normativa** (botón flotante): responde preguntas sobre la normativa del centro **citando siempre la fuente**.
 
@@ -260,7 +264,7 @@ Un solo archivo, `prototipo/index.html`:
 
 | Bloque | Contenido |
 |---|---|
-| `<style>` | Variables de diseño (colores, semáforo), tema claro/oscuro con `data-theme`, diseño mobile-first con barra lateral desde 1000 px. |
+| `<style>` | Variables de diseño (colores, semáforo), tema claro/oscuro con `data-theme`, diseño mobile-first con barra lateral desde 1000 px. La paleta sigue a invermar.cl: azul marino del logo `#03215C` (`--brand`), cian de acento `#00BBFF` (`--accent`, línea bajo la barra superior), azul de botones `#0072B2` (`--primary`), fondo `#F7F7F7` y grises `#6E6E6E` / `#85868C`. En modo oscuro la barra superior es azul marino y el logo se muestra en blanco. |
 | Datos de ejemplo | `INSTALACIONES`, `DOCS_AUCHA`, `PERT_AUCHA`, `NORMAS_CITADAS`, `ALERTAS`, `REQ_TEMPLATES`. |
 | Estado | `freshState`, `newAudit`, `load`, `save`, `syncA` (auditoría abierta `A`), `auditsOf`, `stats`. |
 | Vistas | `viewInicio`, `viewCentro`, `viewNueva`, `viewPreparar` (`prepDatos`, `prepDocs`, `prepPerts`, `prepReqs`, `addFormHTML`), `viewTerreno` + `listHTML`, `viewReq`, `viewPanel`, `chatHTML`. |

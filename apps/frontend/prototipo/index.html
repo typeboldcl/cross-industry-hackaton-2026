@@ -4,34 +4,44 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Auditorías por Instalación</title>
-<meta name="theme-color" content="#0f5c6e">
+<meta name="theme-color" content="#ffffff">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* Paleta basada en invermar.cl: azul marino del logo, cian de acento (#00BBFF), azul de botones (#0072B2),
+   fondo #F7F7F7 y grises de texto. Tipografía Montserrat, como el sitio. */
 :root{
-  --bg:#f4f6f7; --surface:#ffffff; --surface-2:#eef2f3; --border:#d9e0e3;
-  --text:#14212b; --muted:#5b6b75; --primary:#0f5c6e; --primary-ink:#ffffff; --primary-soft:#e2f0f3;
+  --brand:#03215c; --accent:#00bbff;
+  --bg:#f7f7f7; --surface:#ffffff; --surface-2:#eef1f5; --border:#dde2e8;
+  --text:#1f2a3a; --muted:#6e6e6e; --primary:#0072b2; --primary-ink:#ffffff; --primary-soft:#e2f2fb;
   --ok:#1e9e5a; --ok-soft:#e3f5ea; --warn:#c98a00; --warn-soft:#fdf3d8; --bad:#d64545; --bad-soft:#fbe6e6;
-  --na:#8a98a1; --na-soft:#eceff1; --info:#2f6fd6; --info-soft:#e6eefb;
-  --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+  --na:#85868c; --na-soft:#eeeef0; --info:#0072b2; --info-soft:#e2f2fb;
+  --topbar-bg:#ffffff; --topbar-ink:var(--brand); --logo-filter:none;
+  --radius:14px; --shadow:0 1px 2px rgba(3,33,92,.06),0 4px 14px rgba(3,33,92,.05);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0f1519; --surface:#172026; --surface-2:#1e2a31; --border:#2b3a43;
-    --text:#e6edf1; --muted:#9aabb5; --primary:#3fb0c9; --primary-ink:#06222a; --primary-soft:#163640;
+    --brand:#cfe0ff; --accent:#33c9ff;
+    --bg:#0a1424; --surface:#111e33; --surface-2:#182941; --border:#243954;
+    --text:#e6edf5; --muted:#9daabb; --primary:#33c3ff; --primary-ink:#03213f; --primary-soft:#0f3150;
     --ok:#3ccb7f; --ok-soft:#143523; --warn:#e8b23a; --warn-soft:#3a2f12; --bad:#f06b6b; --bad-soft:#3d1c1c;
-    --na:#7d8b94; --na-soft:#222d33; --info:#6fa0f0; --info-soft:#1a2a45;
+    --na:#8592a3; --na-soft:#1c2a3d; --info:#33c3ff; --info-soft:#0f3150;
+    --topbar-bg:#03215c; --topbar-ink:#ffffff; --logo-filter:brightness(0) invert(1);
     --shadow:none;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0f1519; --surface:#172026; --surface-2:#1e2a31; --border:#2b3a43;
-  --text:#e6edf1; --muted:#9aabb5; --primary:#3fb0c9; --primary-ink:#06222a; --primary-soft:#163640;
+  --brand:#cfe0ff; --accent:#33c9ff;
+  --bg:#0a1424; --surface:#111e33; --surface-2:#182941; --border:#243954;
+  --text:#e6edf5; --muted:#9daabb; --primary:#33c3ff; --primary-ink:#03213f; --primary-soft:#0f3150;
   --ok:#3ccb7f; --ok-soft:#143523; --warn:#e8b23a; --warn-soft:#3a2f12; --bad:#f06b6b; --bad-soft:#3d1c1c;
-  --na:#7d8b94; --na-soft:#222d33; --info:#6fa0f0; --info-soft:#1a2a45;
+  --na:#8592a3; --na-soft:#1c2a3d; --info:#33c3ff; --info-soft:#0f3150;
+  --topbar-bg:#03215c; --topbar-ink:#ffffff; --logo-filter:brightness(0) invert(1);
   --shadow:none;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font:15px/1.45 Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:var(--primary)}
@@ -40,12 +50,17 @@ body.has-nav .app{padding-bottom:84px}
 body:not(.has-nav) .nav{display:none}
 body:not(.has-nav) .sticky-foot{bottom:12px}
 /* Header */
-.topbar{position:sticky;top:0;z-index:20;background:var(--primary);color:var(--primary-ink);padding:10px 16px;display:flex;align-items:center;gap:10px}
-.topbar h1{font-size:16px;margin:0;font-weight:650;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.topbar small{display:block;font-weight:400;opacity:.85;font-size:12px}
-.net{font-size:12px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.18);white-space:nowrap}
-.theme-btn{width:34px;height:34px;flex:none;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:inherit;display:grid;place-items:center;padding:0}
-.theme-btn:hover{background:rgba(255,255,255,.3)}
+.topbar{position:sticky;top:0;z-index:20;background:var(--topbar-bg);color:var(--topbar-ink);padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--accent)}
+.brand-logo{height:24px;width:auto;flex:none;filter:var(--logo-filter);display:block}
+.topbar .sep{width:1px;align-self:stretch;margin:2px 0;background:currentColor;opacity:.2;flex:none}
+.topbar h1{font-size:14.5px;margin:0;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar small{display:block;font-weight:500;opacity:.75;font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+.ttl-s{display:none}
+@media (max-width:520px){.ttl-l{display:none}.ttl-s{display:inline}}
+@media (max-width:380px){.brand-logo{height:19px}.topbar{gap:9px}}
+.net{font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,currentColor 10%,transparent);white-space:nowrap}
+.theme-btn{width:34px;height:34px;flex:none;border-radius:50%;border:0;background:color-mix(in srgb,currentColor 10%,transparent);color:inherit;display:grid;place-items:center;padding:0}
+.theme-btn:hover{background:color-mix(in srgb,currentColor 18%,transparent)}
 .theme-btn svg{width:18px;height:18px}
 .net.off{background:var(--warn);color:#1b1400}
 .main{max-width:760px;margin:0 auto;padding:16px}
@@ -57,7 +72,7 @@ body:not(.has-nav) .sticky-foot{bottom:12px}
 @media (min-width:1000px){
   .app{padding-bottom:0}
   body.has-nav .app{padding-bottom:0;padding-left:220px}
-  .nav{top:56px;bottom:0;right:auto;width:220px;flex-direction:column;border-top:0;border-right:1px solid var(--border);padding:12px}
+  .nav{top:var(--topbar-h,56px);bottom:0;right:auto;width:220px;flex-direction:column;border-top:0;border-right:1px solid var(--border);padding:12px}
   .nav a{flex:0;flex-direction:row;gap:10px;font-size:14px;padding:10px 12px;justify-content:flex-start}
   .nav a.on{background:var(--primary-soft)}
   .topbar{padding-left:20px}
@@ -71,8 +86,8 @@ body:not(.has-nav) .sticky-foot{bottom:12px}
 .muted{color:var(--muted)}
 .small{font-size:13px}
 .xs{font-size:12px}
-h2{font-size:20px;margin:4px 0 2px}
-h3{font-size:16px;margin:0}
+h2{font-size:20px;margin:4px 0 2px;color:var(--brand);font-weight:700}
+h3{font-size:16px;margin:0;color:var(--brand)}
 .sec-title{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:18px 2px 8px;font-weight:650}
 .btn{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;justify-content:center}
 a.btn{text-decoration:none;color:var(--text)}
@@ -157,6 +172,14 @@ textarea{min-height:80px;resize:vertical}
 .q-btns button.on.no_cumple{border-color:var(--bad);background:var(--bad-soft)}
 .q-btns button.on.na{border-color:var(--na);background:var(--na-soft)}
 .q-btns button:disabled{opacity:.55;cursor:default}
+/* Buscador y pestañas fijos bajo la barra superior al hacer scroll */
+.filters{position:sticky;top:var(--topbar-h,56px);z-index:15;background:var(--bg);margin:12px -16px 0;padding:8px 16px 10px;border-bottom:1px solid transparent}
+.filters.stuck{border-bottom-color:var(--border);box-shadow:0 4px 10px -8px rgba(0,0,0,.3)}
+.filters>*+*{margin-top:8px}
+.filters input[type=search]{padding-top:9px;padding-bottom:9px}
+.filters .tabs button{white-space:nowrap;font-size:13.5px;padding:7px 4px}
+.t-num{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:700;min-width:16px}
+.i-num{display:inline-block;font-size:11.5px;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:0 5px;margin-right:6px;vertical-align:1px;font-variant-numeric:tabular-nums}
 .item.done{text-decoration:none;border-width:2px}
 .item.done .src{display:block;margin-top:2px}
 .item.done .d-note{display:block;font-size:13px;margin-top:4px;color:var(--text)}
@@ -234,8 +257,9 @@ a.select-card:hover{border-color:var(--primary)}
 <body>
 <div class="app">
   <header class="topbar">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    <h1 id="hdr">Auditorías por instalación<small id="hdr-sub">Piscicultura Aucha</small></h1>
+    <a href="#/inicio" aria-label="Invermar · ir a Centros"><img class="brand-logo" src="assets/invermar-logo.png" alt="Invermar"></a>
+    <span class="sep" aria-hidden="true"></span>
+    <h1 id="hdr"><span class="ttl-l">Auditorías por instalación</span><span class="ttl-s">Auditorías</span><small id="hdr-sub">Piscicultura Aucha</small></h1>
     <span class="net" id="net">En línea</span>
     <button class="theme-btn" id="theme-btn" data-action="theme" aria-label="Cambiar a modo oscuro" title="Cambiar tema"></button>
   </header>
@@ -421,7 +445,7 @@ function applyTheme(t){
   const b = $('#theme-btn');
   b.innerHTML = icon(t==='dark'?'sun':'moon', 18);
   b.setAttribute('aria-label', t==='dark'?'Cambiar a modo claro':'Cambiar a modo oscuro');
-  document.querySelector('meta[name=theme-color]').content = t==='dark' ? '#172026' : '#0f5c6e';
+  document.querySelector('meta[name=theme-color]').content = t==='dark' ? '#03215c' : '#ffffff';
 }
 function getTheme(){ try{ return localStorage.getItem(THEME_KEY)==='dark' ? 'dark' : 'light'; }catch(e){ return 'light'; } }
 function toggleTheme(){ const t = getTheme()==='dark' ? 'light' : 'dark'; try{ localStorage.setItem(THEME_KEY, t); }catch(e){} applyTheme(t); }
@@ -670,8 +694,8 @@ function viewTerreno(){
     ${closed?`<div class="alert info"><div><b>Auditoría cerrada el ${fmtDate(A.cerrada)}</b>Solo lectura: puedes revisar los resultados y evidencias.</div></div>`:''}
     <div class="card">${progressBar(st)}<div class="row small" style="margin-top:8px"><span class="grow muted">${st.llenos}/${st.total} llenados</span><span><b>${st.pct==null?'—':st.pct+'%'}</b> cumplimiento</span></div>
       <div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Cumple ${st.cumple}</span><span><i style="background:var(--bad)"></i>No cumple ${st.no_cumple}</span><span><i style="background:var(--na)"></i>N/A ${st.na}</span></div></div>
-    <input type="search" id="q" placeholder="Buscar requisito, tema o documento…" value="${esc(S.q)}" aria-label="Buscador">
-    <div class="tabs"><button class="${S.tab==='todos'?'on':''}" data-action="tab" data-t="todos">Todos · ${st.total}</button><button class="${S.tab==='done'?'on':''}" data-action="tab" data-t="done">Llenados · ${st.llenos}</button><button class="${S.tab==='pend'?'on':''}" data-action="tab" data-t="pend">Pendientes · ${st.pendiente}</button></div>
+    <div class="filters"><input type="search" id="q" placeholder="Buscar requisito, tema o documento…" value="${esc(S.q)}" aria-label="Buscador">
+    <div class="tabs"><button class="${S.tab==='todos'?'on':''}" data-action="tab" data-t="todos">Todos · ${st.total}</button><button class="${S.tab==='done'?'on':''}" data-action="tab" data-t="done">Llenados · ${st.llenos}</button><button class="${S.tab==='pend'?'on':''}" data-action="tab" data-t="pend">Pendientes · ${st.pendiente}</button></div></div>
     <div id="list">${listHTML()}</div>
     ${closed?'':`<button class="btn block" data-action="add-from-field">+ Agregar requisito encontrado en terreno</button>`}
   </div>`;
@@ -682,33 +706,48 @@ function listHTML(){
   if(q) list = list.filter(r => (r.titulo+' '+r.tema+' '+r.detalle+' '+docById(r.fuente.doc).numero).toLowerCase().includes(q));
   if(!list.length) return `<div class="empty">${q?'Ningún requisito coincide con la búsqueda.':S.tab==='pend'?'No hay requisitos pendientes. ¡Buen trabajo!':S.tab==='done'?'Aún no hay requisitos llenados.':'No hay requisitos en esta auditoría.'}</div>`;
   const temas = [...new Set(list.map(r=>r.tema))];
-  const ro = A.status==='cerrada';
+  const ro = A.status==='cerrada', num = numeracion();
+  // Orden dentro de cada temática: pendientes (para que se vean), luego Cumple, No cumple y al final N/A.
+  // Dentro de cada estado se respeta la numeración de la planilla.
+  const ORD = {pendiente:0, cumple:1, no_cumple:2, na:3};
   return temas.map(t=>{
-    // Dentro de cada temática, los pendientes van primero para que se vean; los ya marcados bajan.
-    const items = list.filter(r=>r.tema===t).sort((a,b)=>(a.estado==='pendiente'?0:1)-(b.estado==='pendiente'?0:1));
+    const items = list.filter(r=>r.tema===t).sort((a,b)=>(ORD[a.estado]-ORD[b.estado]) || (num.idx[a.id]-num.idx[b.id]));
     const pend = items.filter(r=>r.estado==='pendiente').length;
     const temaNA = S.tab!=='done' && !ro && pend>1 ? `<button class="tema-na" data-action="tema-na" data-t="${esc(t)}">Tema no aplica</button>` : '';
     const cnt = S.tab==='todos' ? `${items.length-pend}/${items.length}` : items.length;
-    return `<details class="group" open><summary>${esc(t)}${temaNA}<span class="cnt small muted">${cnt}</span></summary>
-      ${items.map(r=>r.estado==='pendiente' ? itemHTML(r, ro) : doneHTML(r)).join('')}
+    return `<details class="group" open><summary><span class="t-num">${num.tema[t]}</span>${esc(t)}${temaNA}<span class="cnt small muted">${cnt}</span></summary>
+      ${items.map(r=>r.estado==='pendiente' ? itemHTML(r, ro, num.code[r.id]) : doneHTML(r, num.code[r.id])).join('')}
     </details>`;
   }).join('');
 }
+// Numeración como la planilla en papel: temática 1, 2, 3… e ítems 1-a, 1-b…
+// Se calcula sobre todos los requisitos validados, así el código no cambia al filtrar o marcar.
+function numeracion(a=A){
+  const temas=[], tema={}, code={}, idx={}, cont={};
+  activeReqs(a).forEach((r,i)=>{
+    if(!(r.tema in tema)){ temas.push(r.tema); tema[r.tema]=temas.length; cont[r.tema]=0; }
+    const k = cont[r.tema]++;
+    code[r.id] = `${tema[r.tema]}-${k<26 ? String.fromCharCode(97+k) : 'z'+(k-25)}`;
+    idx[r.id] = i;
+  });
+  return {tema, code, idx};
+}
+const numHTML = c => c ? `<span class="i-num">${c}</span>` : '';
 // Requisito ya marcado: recuadro del color de su estado, sin botones. Se corrige abriendo el detalle.
-function doneHTML(r){
+function doneHTML(r, code){
   const n = r.evidencias.length;
   const nota = r.estado==='na' ? (r.naMotivo?`No aplica: ${r.naMotivo}`:'Falta el motivo de No aplica') : r.obs;
   return `<a class="item done ${r.estado}" href="#/req/${r.id}">
-    <span class="grow"><span class="row" style="gap:8px;align-items:flex-start"><span class="t grow">${esc(r.titulo)}</span><span class="st-lbl">${ESTADOS[r.estado]}</span></span>
+    <span class="grow"><span class="row" style="gap:8px;align-items:flex-start"><span class="t grow">${numHTML(code)}${esc(r.titulo)}</span><span class="st-lbl">${ESTADOS[r.estado]}</span></span>
       <span class="src">${esc(r.frecuencia)} · ${esc(docById(r.fuente.doc).tipo)}${n?` · ${n} evidencia${n>1?'s':''}`:''}</span>
       ${nota?`<span class="d-note">${esc(nota)}</span>`:''}</span><span class="chev">${icon('chev',18)}</span></a>`;
 }
-function itemHTML(r, ro){
+function itemHTML(r, ro, code){
   const lbl = {cumple:'Cumple', no_cumple:'No cumple', na:'N/A'};
   const extra = [r.frecuencia, docById(r.fuente.doc).tipo, r.evidencias.length?`${r.evidencias.length} evidencia${r.evidencias.length>1?'s':''}`:'' ].filter(Boolean).join(' · ');
   return `<div class="item q">
     <a class="q-top" href="#/req/${r.id}"><span class="dot ${r.estado}"></span>
-      <span class="grow"><span class="t">${esc(r.titulo)}</span><br><span class="src">${esc(extra)}</span>
+      <span class="grow"><span class="t">${numHTML(code)}${esc(r.titulo)}</span><br><span class="src">${esc(extra)}</span>
       ${r.estado==='na'&&r.naMotivo?`<br><span class="small muted">No aplica: ${esc(r.naMotivo)}</span>`:''}
       ${r.venc&&r.estado==='pendiente'?`<br>${dueTag(r.venc)}`:''}</span><span class="chev">${icon('chev',18)}</span></a>
     <div class="q-btns">${['cumple','no_cumple','na'].map(k=>`<button class="${k} ${r.estado===k?'on':''}" data-action="quick-estado" data-id="${r.id}" data-k="${k}" ${ro?'disabled':''} aria-pressed="${r.estado===k}"><span class="dot ${k}"></span>${lbl[k]}</button>`).join('')}</div>
@@ -740,7 +779,7 @@ function viewReq(id){
   const d = docById(r.fuente.doc), ro = A.status==='cerrada' ? 'disabled' : '';
   return `<div class="stack">
     <a href="#/terreno" class="btn ghost" style="padding-left:0">${icon('back',18)} Volver al checklist</a>
-    <div><span class="tag">${esc(r.tema)}</span><h2 style="margin-top:6px">${esc(r.titulo)}</h2><p style="margin:4px 0 0">${esc(r.detalle)}</p></div>
+    <div>${numHTML(numeracion().code[r.id])}<span class="tag">${esc(r.tema)}</span><h2 style="margin-top:6px">${esc(r.titulo)}</h2><p style="margin:4px 0 0">${esc(r.detalle)}</p></div>
     ${r.rectificado?`<div class="alert warn"><div><b>Actualizado por rectificación</b>${esc(r.rectificado)}</div></div>`:''}
     <div class="sec-title">¿Cumple?</div>
     <div class="status-grid">${['cumple','no_cumple','na'].map(k=>`<button class="st ${k} ${r.estado===k?'on':''}" data-action="set-estado" data-id="${r.id}" data-k="${k}" ${ro}><span class="dot ${k}"></span>${ESTADOS[k]}</button>`).join('')}</div>
@@ -1015,7 +1054,13 @@ document.addEventListener('click', e=>{
       break;
     }
     case 'publish': publish(); break;
-    case 'tab': S.tab=el.dataset.t; S.naPick=null; S.notePick=null; S.noteDraft=null; save(); render(); break;
+    case 'tab': {
+      const f=$('.filters'), stuck=f && f.classList.contains('stuck');
+      S.tab=el.dataset.t; S.naPick=null; S.notePick=null; S.noteDraft=null; save(); render();
+      // Si los filtros estaban pegados arriba, se vuelve al inicio de la lista en vez de quedar a mitad de página.
+      if(stuck){ const nf=$('.filters'), l=$('#list'); window.scrollTo(0, l.getBoundingClientRect().top + scrollY - nf.offsetHeight - $('.topbar').offsetHeight - 4); }
+      break;
+    }
     case 'set-estado': {
       const k=el.dataset.k;
       if(req.estado!==k && k==='no_cumple' && !(($('#obs')?.value||req.obs||'').trim())){
@@ -1099,6 +1144,14 @@ function updateNet(){
 window.addEventListener('online', ()=>{ scheduleSync(); toast('Conexión recuperada: sincronizando'); });
 window.addEventListener('offline', ()=>{ updateNet(); toast('Sin conexión: los cambios se guardan en el teléfono'); });
 window.addEventListener('hashchange', ()=>{ render(); window.scrollTo(0,0); });
+// Los filtros de Terreno se pegan justo bajo la barra superior (su alto cambia según el texto).
+function syncSticky(){
+  const tb=$('.topbar'); if(tb) document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight+'px');
+  const f=$('.filters'); if(f) f.classList.toggle('stuck', f.getBoundingClientRect().top <= (tb?tb.offsetHeight:0)+1 && window.scrollY>0);
+}
+window.addEventListener('scroll', syncSticky, {passive:true});
+window.addEventListener('resize', syncSticky);
+new MutationObserver(syncSticky).observe(document.getElementById('view') || document.body, {childList:true});
 
 applyTheme(getTheme()); load(); render(); if(S.pending) scheduleSync();
 </script>

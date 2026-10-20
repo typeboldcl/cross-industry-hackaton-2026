@@ -4,7 +4,7 @@ Frontend for challenge 4: automating environmental and permit audits per install
 
 ## `prototipo/`
 
-A clickable, mobile-first prototype in a single static HTML file (no build, no dependencies). It is here to agree on the flow before porting it to React; once that happens this folder becomes a workspace package with its own `package.json`.
+A clickable, mobile-first prototype in a single static HTML file (no build, no dependencies), styled with Invermar's logo (`prototipo/assets/invermar-logo.png`), the colour palette from invermar.cl and the Montserrat font. It is here to agree on the flow before porting it to React; once that happens this folder becomes a workspace package with its own `package.json`.
 
 Open `prototipo/index.html` directly in a browser. Progress is stored in the browser's `localStorage`; use "Reiniciar prototipo" on the Centros screen to reset it, or "Cargar ejemplo" to load Piscicultura Aucha with two audits (Q3 closed, Q4 in progress on site).
 
@@ -20,7 +20,7 @@ Centro (installation) → Auditorías (several per centro, in progress and close
 - **Auditorías del centro**: "+ Crear nueva auditoría", audits in progress and closed, the centro's documents and the alerts found across them.
 - **Crear nueva auditoría**: type, name and date; the centro comes locked from the previous screen.
 - **Preparar** (before visiting the site): audit details, load the RCA and sectoral resolutions, load pertinencias, generate requirements, then have a responsible person validate them (pick themes, edit, discard or add requirements the analysis missed) and publish.
-- **Terreno**: search, Todos / Llenados / Pendientes tabs, requirements grouped by theme with pending ones first, status (Cumple / No cumple / No aplica, matching Invermar's current SÍ / NO / N/A sheet) set straight from each pending row (marked ones turn into a coloured card and are edited from the detail), notes, photo and file evidence, and a per-requirement change history. No cumple requires a note (evidence is optional), No aplica requires a reason, a whole theme can be marked No aplica, and every change can be undone for a few seconds. Works offline. Closed audits are read-only.
+- **Terreno**: search and Todos / Llenados / Pendientes tabs that stay pinned while scrolling, requirements numbered like the paper sheet (1-a, 1-b…) and grouped by theme, ordered pending → Cumple → No cumple → N/A, status (Cumple / No cumple / No aplica, matching Invermar's current SÍ / NO / N/A sheet) set straight from each pending row (marked ones turn into a coloured card and are edited from the detail), notes, photo and file evidence, and a per-requirement change history. No cumple requires a note (evidence is optional), No aplica requires a reason, a whole theme can be marked No aplica, and every change can be undone for a few seconds. Works offline. Closed audits are read-only.
 - **Panel**: compliance per theme, upcoming due dates, findings, the centro's audit history, and "Cerrar auditoría".
 - **Chat**: answers questions about the installation's requirements and always cites the source document.
 

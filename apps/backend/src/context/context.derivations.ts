@@ -49,6 +49,12 @@ const RCA_REFERENCE =
   /\bRCA\s+N[°º]?\s*(\d{1,4})\s+de\s+fecha\s+\d{1,2}\/\d{1,2}\/(\d{4})/gi;
 const RESOLUTION_REFERENCE =
   /Resoluci[oó]n\s+Exenta\s+N[°º]?\s*:?\s*(\d[\d/.-]*\d)/gi;
+const PERTINENCIA_ID = /^PERTI-\d{4}-\d+$/;
+const CITED_PERTINENCIA_ID = /PERTI[-_]\s*(\d{4})\s*-\s*(\d+)/i;
+const CITATION_CONTEXT_LENGTH = 400;
+const NEXT_LISTED_ITEM = /\n\s*(?:\d+[.°)]|-)\s/;
+const MIN_NAME_WORDS = 3;
+const MIN_NAME_COVERAGE = 0.8;
 
 export function deriveDocumentStatus(
   document: DocumentFacts,
@@ -108,15 +114,29 @@ export function distinctiveWords(facilityName: string): string[] {
 
 export function filterRelevantPertinencias(
   candidates: SeiaPertinencia[],
-  facilityName: string,
+  facility: { name: string; comuna: string },
 ): SeiaPertinencia[] {
-  const words = distinctiveWords(facilityName);
+  const words = distinctiveWords(facility.name);
+  const comuna = foldText(facility.comuna).trim();
   const unique = new Map(candidates.map((p) => [p.id, p]));
   return [...unique.values()].filter((pertinencia) => {
+    if (
+      comuna &&
+      pertinencia.comuna &&
+      foldText(pertinencia.comuna).trim() !== comuna
+    ) {
+      return false;
+    }
     if (words.length === 0) return true;
-    const name = foldText(pertinencia.name);
-    return words.some((word) => name.includes(word));
+    const nameWords = new Set(wordsOf(pertinencia.name));
+    return words.some((word) => nameWords.has(word));
   });
+}
+
+function wordsOf(value: string): string[] {
+  return foldText(value)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 }
 
 export function toFacilityPertinencias(
@@ -139,7 +159,10 @@ export function toFacilityPertinencias(
   });
 }
 
-export function extractReferences(pages: string[]): DocumentReference[] {
+export function extractReferences(
+  pages: string[],
+  pertinencias: Pick<SeiaPertinencia, "id" | "name">[] = [],
+): DocumentReference[] {
   const text = pages.join("\n");
   const references: DocumentReference[] = [];
 
@@ -149,29 +172,72 @@ export function extractReferences(pages: string[]): DocumentReference[] {
   }
   for (const match of text.matchAll(RESOLUTION_REFERENCE)) {
     const number = normalizeDocumentNumber(match[1] ?? "");
-    if (number) {
-      references.push({ number, label: `Resolución Exenta N° ${number}` });
-    }
+    if (!number) continue;
+    const label = `Resolución Exenta N° ${number}`;
+    const pertinenciaId = citedPertinencia(
+      citationContext(text, match.index + match[0].length),
+      pertinencias,
+    );
+    references.push(
+      pertinenciaId
+        ? {
+            number: pertinenciaId,
+            label: `pertinencia ${pertinenciaId} (${label})`,
+          }
+        : { number, label },
+    );
   }
   return references;
+}
+
+function citationContext(text: string, from: number): string {
+  const following = text.slice(from, from + CITATION_CONTEXT_LENGTH);
+  const end = following.search(NEXT_LISTED_ITEM);
+  return end === -1 ? following : following.slice(0, end);
+}
+
+function citedPertinencia(
+  context: string,
+  pertinencias: Pick<SeiaPertinencia, "id" | "name">[],
+): string | null {
+  const cited = CITED_PERTINENCIA_ID.exec(context);
+  if (cited) return `PERTI-${cited[1]}-${cited[2]}`;
+
+  const folded = foldText(context).replace(/\s+/g, " ");
+  let best: { id: string; coverage: number } | null = null;
+  for (const pertinencia of pertinencias) {
+    const words = wordsOf(pertinencia.name).filter(
+      (word) => word.length >= MIN_DISTINCTIVE_LENGTH,
+    );
+    if (words.length < MIN_NAME_WORDS) continue;
+    const coverage =
+      words.filter((word) => folded.includes(word)).length / words.length;
+    if (coverage >= MIN_NAME_COVERAGE && coverage > (best?.coverage ?? 0)) {
+      best = { id: pertinencia.id, coverage };
+    }
+  }
+  return best?.id ?? null;
+}
+
+function referenceKey(raw: string): string | null {
+  return PERTINENCIA_ID.test(raw) ? raw : normalizeDocumentNumber(raw);
 }
 
 export function missingReferenceAlerts(
   documents: CitingDocument[],
   loadedNumbers: Iterable<string | null>,
+  pertinencias: Pick<SeiaPertinencia, "id" | "name">[] = [],
 ): FacilityAlert[] {
   const loaded = new Set<string>();
   for (const raw of loadedNumbers) {
-    const number = raw ? normalizeDocumentNumber(raw) : null;
+    const number = raw ? referenceKey(raw) : null;
     if (number) loaded.add(number);
   }
 
   const alerts = new Map<string, FacilityAlert>();
   for (const document of documents) {
-    const own = document.number
-      ? normalizeDocumentNumber(document.number)
-      : null;
-    for (const reference of extractReferences(document.pages)) {
+    const own = document.number ? referenceKey(document.number) : null;
+    for (const reference of extractReferences(document.pages, pertinencias)) {
       const id = `missing-ref:${reference.number}`;
       if (reference.number === own || loaded.has(reference.number)) continue;
       if (alerts.has(id)) continue;

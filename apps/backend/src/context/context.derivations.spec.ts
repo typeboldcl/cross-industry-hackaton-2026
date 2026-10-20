@@ -103,15 +103,28 @@ describe("pertinencias", () => {
         pertinencia({ id: "2", name: "Piscicultura Otra" }),
         pertinencia({ id: "3", name: "Cambio Áucha norte" }),
       ],
-      "Piscicultura Aucha",
+      { name: "Piscicultura Aucha", comuna: "" },
     );
     expect(result.map((p) => p.id)).toEqual(["1", "3"]);
     expect(
       filterRelevantPertinencias(
         [pertinencia({ id: "4", name: "Planta Pucón" })],
-        "Piscicultura Púcon",
+        { name: "Piscicultura Púcon", comuna: "" },
       ),
     ).toHaveLength(1);
+  });
+
+  it("requires the whole word and the same comuna", () => {
+    const result = filterRelevantPertinencias(
+      [
+        pertinencia({ id: "1", name: "CES Auchac", comuna: "Quellón" }),
+        pertinencia({ id: "2", name: "Cambio Aucha", comuna: "Quellón" }),
+        pertinencia({ id: "3", name: "Mejoras Aucha", comuna: "Calbuco" }),
+        pertinencia({ id: "4", name: "Ajustes Aucha", comuna: null }),
+      ],
+      { name: "Piscicultura Aucha", comuna: "Calbuco" },
+    );
+    expect(result.map((p) => p.id)).toEqual(["3", "4"]);
   });
 
   it("flags loaded pertinencias by matching document number", () => {
@@ -130,6 +143,59 @@ describe("pertinencias", () => {
 });
 
 describe("references", () => {
+  const pertinencias = [
+    {
+      id: "PERTI-2020-10742",
+      name: "Ajuste de cumplimiento normativo del D.S. N° 90/2000 de la Piscicultura de Recirculación Aucha",
+    },
+    {
+      id: "PERTI-2021-10169",
+      name: "Aumento de caudal de descarga de la Piscicultura de recirculación Aucha",
+    },
+  ];
+
+  it("links a resolution to the pertinencia it resolves, by its ID or its name", () => {
+    const refs = extractReferences(
+      [
+        `4. La Resolución Exenta N°20201010128 de fecha 12 de enero de 2020, que se pronuncia sobre la consulta de
+pertinencia del proyecto "Ajuste de cumplimiento normativo del D.S. N° 90/2000", ID: PERTI-
+2020-10742, presentada por Invermar S.A.
+5. La Resolución Exenta N°202010101288 de fecha 7 de octubre de 2020, que resuelve la consulta de pertinencia
+"Ajustes de cumplimiento normativo del D.S. N°90/2000 de la Piscicultura de Recirculación Aucha".
+6. La Resolución Exenta N°202110101353 de fecha 07 de julio de 2021 (ID PERTI_2021-10169).
+7. La Resolución Exenta N°202310101465 de fecha 07 de agosto de 2023.`,
+      ],
+      pertinencias,
+    );
+    expect(refs.map((r) => r.number)).toEqual([
+      "PERTI-2020-10742",
+      "PERTI-2020-10742",
+      "PERTI-2021-10169",
+      "202310101465",
+    ]);
+    expect(refs[0]!.label).toBe(
+      "pertinencia PERTI-2020-10742 (Resolución Exenta N° 20201010128)",
+    );
+  });
+
+  it("treats a cited pertinencia as loaded when its document is", () => {
+    const alerts = missingReferenceAlerts(
+      [
+        {
+          id: "d1",
+          number: "PERTI-2025-2767",
+          title: "Pertinencia 2025",
+          pages: [
+            "4. La Resolución Exenta N°20201010128, ID: PERTI-2020-10742.\n5. La Resolución Exenta N°202110101353, ID: PERTI-2021-10169.",
+          ],
+        },
+      ],
+      ["PERTI-2020-10742"],
+      pertinencias,
+    );
+    expect(alerts.map((a) => a.id)).toEqual(["missing-ref:PERTI-2021-10169"]);
+  });
+
   it("extracts RCA and Resolución Exenta citations", () => {
     const refs = extractReferences([
       "Considerando la RCA N° 49 de fecha 06/02/2017 del proyecto.",

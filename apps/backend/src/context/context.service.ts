@@ -100,6 +100,7 @@ export class ContextService {
         ...missingReferenceAlerts(
           citing,
           facts.map((fact) => fact.number),
+          pertinenciaResult.items,
         ),
         ...info,
       ],
@@ -122,7 +123,7 @@ export class ContextService {
       ]);
       const items = filterRelevantPertinencias(
         [...byName.items, ...byTitular.items],
-        facility.name,
+        facility,
       );
       this.pertinenciaCache.set(facility.id, {
         items,

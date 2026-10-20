@@ -7,5 +7,6 @@ import { AuditsService } from "./audits.service.js";
   imports: [ObligationsModule],
   controllers: [AuditsController],
   providers: [AuditsService],
+  exports: [AuditsService],
 })
 export class AuditsModule {}

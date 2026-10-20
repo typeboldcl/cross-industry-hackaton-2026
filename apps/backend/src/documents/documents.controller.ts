@@ -19,6 +19,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import type { Response } from "express";
 import { DocumentsService, type UploadedPdf } from "./documents.service.js";
+import { ImportDocumentDto } from "./import-document.dto.js";
 import { UploadDocumentDto } from "./upload-document.dto.js";
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -44,6 +45,22 @@ export class DocumentsController {
     const { document, created } = await this.documents.upload(
       facilityId,
       file,
+      body.kind,
+      body.title,
+    );
+    response.status(created ? 201 : 200);
+    return document;
+  }
+
+  @Post("facilities/:facilityId/documents/import")
+  async import(
+    @Param("facilityId", ParseUUIDPipe) facilityId: string,
+    @Body() body: ImportDocumentDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<DocumentDetail> {
+    const { document, created } = await this.documents.importFromUrl(
+      facilityId,
+      body.url,
       body.kind,
       body.title,
     );

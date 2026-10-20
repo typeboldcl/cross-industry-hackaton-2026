@@ -66,3 +66,11 @@ export type {
   RequisitoExtraido,
   Validacion,
 } from "./auditoria.js";
+export type {
+  AlertKind,
+  DocumentStatus,
+  FacilityAlert,
+  FacilityContext,
+  FacilityDocument,
+  FacilityPertinencia,
+} from "./context.js";

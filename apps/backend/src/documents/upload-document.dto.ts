@@ -1,7 +1,7 @@
 import type { DocumentKind } from "@hackaton/contracts";
 import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
-const DOCUMENT_KINDS: DocumentKind[] = [
+export const DOCUMENT_KINDS: DocumentKind[] = [
   "rca",
   "rectificacion",
   "pertinencia",

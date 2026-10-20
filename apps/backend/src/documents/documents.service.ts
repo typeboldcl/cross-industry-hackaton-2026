@@ -22,6 +22,7 @@ import {
   type ProcessingDispatcher,
 } from "../processing/processing-dispatcher.js";
 import { STORAGE, type StorageService } from "../storage/storage.service.js";
+import { SeiaClient } from "../seia/seia.client.js";
 import { numberFromFilename } from "./document-number.js";
 import { DocumentEntity } from "./entities/document.entity.js";
 
@@ -58,6 +59,7 @@ export class DocumentsService {
     @Inject(STORAGE) private readonly storage: StorageService,
     @Inject(PROCESSING_DISPATCHER)
     private readonly dispatcher: ProcessingDispatcher,
+    @Inject(SeiaClient) private readonly seia: SeiaClient,
   ) {}
 
   async upload(
@@ -65,10 +67,9 @@ export class DocumentsService {
     file: UploadedPdf,
     kind: DocumentKind,
     title?: string,
+    source?: { origin: "fetched"; url: string },
   ): Promise<UploadResult> {
-    if (!(await this.facilities.existsBy({ id: facilityId }))) {
-      throw new NotFoundException("Instalación no encontrada.");
-    }
+    await this.assertFacility(facilityId);
 
     if (file.buffer.subarray(0, 5).toString("latin1") !== "%PDF-") {
       throw new UnsupportedMediaTypeException("El archivo no es un PDF.");
@@ -101,7 +102,8 @@ export class DocumentsService {
         kind,
         issuerId: issuer?.id ?? null,
         title: title?.trim() || filename.replace(/\.pdf$/i, ""),
-        origin: "uploaded",
+        origin: source?.origin ?? "uploaded",
+        sourceUrl: source?.url ?? null,
       });
     } catch (error) {
       const raced = await this.documents.findOneBy({ sha256 });
@@ -112,6 +114,28 @@ export class DocumentsService {
 
     if (kind !== "otro") await this.dispatcher.dispatch(id);
     return { document: await this.detail(id), created: true };
+  }
+
+  async importFromUrl(
+    facilityId: string,
+    url: string,
+    kind: DocumentKind,
+    title?: string,
+  ): Promise<UploadResult> {
+    this.seia.assertAllowedUrl(url);
+    await this.assertFacility(facilityId);
+    const pdf = await this.seia.downloadPdf(url);
+    return this.upload(
+      facilityId,
+      {
+        buffer: pdf.buffer,
+        originalname: pdf.filename,
+        mimetype: "application/pdf",
+      },
+      kind,
+      title,
+      { origin: "fetched", url },
+    );
   }
 
   async list(facilityId: string): Promise<DocumentSummary[]> {
@@ -153,6 +177,12 @@ export class DocumentsService {
       document.storageKey,
       `${document.title}.pdf`,
     );
+  }
+
+  private async assertFacility(facilityId: string): Promise<void> {
+    if (!(await this.facilities.existsBy({ id: facilityId }))) {
+      throw new NotFoundException("Instalación no encontrada.");
+    }
   }
 
   private async get(id: string): Promise<DocumentEntity> {

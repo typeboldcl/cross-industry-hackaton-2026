@@ -1,69 +1,119 @@
+import type { AuditItem, NaReason } from "@hackaton/contracts";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
+import { actions, attempt, run } from "../api";
 import { EvidenceButtons } from "../components/EvidenceButtons";
 import { Icon } from "../components/Icon";
 import { Dot, DueTag, NumBadge } from "../components/ui";
-import { docById, numeracion } from "../domain/auditoria";
-import { ESTADOS, MARCABLES, NA_MOTIVOS, NA_OTRO } from "../domain/constants";
+import { categoryLookup, numberItems } from "../domain/audit";
 import { fmtDate } from "../domain/format";
+import {
+  MARKABLE,
+  type MarkableResult,
+  NA_REASON_LABEL,
+  NA_REASONS,
+  RESULT_CSS,
+  RESULT_LABEL,
+} from "../domain/labels";
 import { useAuditCtx } from "../hooks/useAuditCtx";
-import { api, attempt, run } from "../api";
 import { toast } from "../store/useUiStore";
 
 export function RequisitoView() {
-  const { reqId } = useParams();
+  const { itemId } = useParams();
   // key: al pasar a otro requisito se reinicia el borrador de la observación.
-  return <Detalle key={reqId} reqId={reqId} />;
+  return <Detalle key={itemId} itemId={itemId} />;
 }
 
-function Detalle({ reqId }: { reqId?: string }) {
-  const a = useAuditCtx();
-  const { state } = useLocation() as { state: { focoObs?: boolean } | null };
-  const r = a.reqs.find((x) => x.id === reqId);
-  const [obs, setObsLocal] = useState(r?.obs ?? "");
-  // Viene de elegir "Otro motivo" en la lista: hay que escribir el motivo.
+type NavState = { focoObs?: boolean; naReason?: NaReason } | null;
+
+function Detalle({ itemId }: { itemId?: string }) {
+  const { audit: a, obligations } = useAuditCtx();
+  const { state } = useLocation() as { state: NavState };
+  const item = a.items.find((x) => x.id === itemId);
+  const [notes, setNotes] = useState(item?.notes ?? "");
   const [need, setNeed] = useState(!!state?.focoObs);
+  // Motivo de N/A elegido y aún no guardado ("Otro motivo" necesita la nota).
+  const [naChoice, setNaChoice] = useState<NaReason | null>(
+    state?.naReason ?? null,
+  );
   const obsRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (state?.focoObs) obsRef.current?.focus();
   }, [state]);
 
-  if (!r) return <div className="empty">Requisito no encontrado.</div>;
-  const ro = a.status === "cerrada";
-  const d = docById(r.fuente.doc, a);
-  const obligatoria = r.estado === "no_cumple" || r.naMotivo === NA_OTRO;
+  if (!item) return <div className="empty">Requisito no encontrado.</div>;
+  const ro = a.status === "closed";
+  const v = item.version;
+  const obligation = obligations.find(
+    (o) => o.obligationId === item.obligationId,
+  );
+  const code = numberItems(a.items, categoryLookup(obligations)).rows.find(
+    (r) => r.item.id === item.id,
+  )?.code;
+  const showNa = item.result === "not_applicable" || naChoice !== null;
+  const reason = naChoice ?? item.naReason;
+  const obligatoria = item.result === "non_compliant" || reason === "other";
 
-  const elegir = (k: (typeof MARCABLES)[number]) => {
-    if (r.estado === k) {
-      void attempt(api.items.assess(a.id, r.id, { estado: "pendiente" })).then(
-        (ok) => ok && toast("Estado borrado"),
-      );
+  const assess = (req: Parameters<typeof actions.assess>[3], ok: string) =>
+    void attempt(actions.assess(a.id, a.facilityId, item, req)).then((done) => {
+      if (done) toast(ok);
+    });
+
+  const elegir = (k: MarkableResult) => {
+    if (item.result === k) {
+      assess({ result: "pending", notes: notes || null }, "Estado borrado");
       return;
     }
-    if (k === "no_cumple" && !obs.trim()) {
+    if (k === "not_applicable") {
+      setNaChoice(item.naReason ?? null);
+      toast("Elige el motivo de No aplica");
+      return;
+    }
+    setNaChoice(null);
+    if (k === "non_compliant" && !notes.trim()) {
       toast("Para marcar No cumple escribe primero la observación");
       setNeed(true);
       obsRef.current?.focus();
       return;
     }
-    void attempt(api.items.assess(a.id, r.id, { estado: k, obs })).then(
-      (ok) =>
-        ok &&
-        toast(
-          k === "na"
-            ? "Elige el motivo de No aplica"
-            : `Guardado: ${ESTADOS[k]}`,
-        ),
+    assess(
+      { result: k, notes: notes.trim() || null },
+      `Guardado: ${RESULT_LABEL[k]}`,
+    );
+  };
+
+  const elegirMotivo = (m: NaReason) => {
+    setNaChoice(m);
+    if (m === "other" && !notes.trim()) {
+      toast("Describe el motivo en la observación");
+      setNeed(true);
+      obsRef.current?.focus();
+      return;
+    }
+    assess(
+      { result: "not_applicable", naReason: m, notes: notes.trim() || null },
+      "Motivo guardado",
     );
   };
 
   const guardarObs = () => {
-    if (!obs.trim() && r.estado === "no_cumple") {
-      setObsLocal(r.obs);
-      toast("La observación es obligatoria para No cumple");
+    if ((notes.trim() || null) === (item.notes ?? null)) return;
+    if (!notes.trim() && obligatoria) {
+      setNotes(item.notes ?? "");
+      toast("La observación es obligatoria para este estado");
       return;
     }
-    void run(api.items.setNotes(a.id, r.id, obs));
+    if (naChoice === "other" && item.result !== "not_applicable") {
+      elegirMotivo("other");
+      return;
+    }
+    void run(
+      actions.assess(a.id, a.facilityId, item, {
+        result: item.result,
+        notes: notes.trim() || null,
+        naReason: item.naReason,
+      }),
+    );
   };
 
   return (
@@ -77,55 +127,51 @@ function Detalle({ reqId }: { reqId?: string }) {
         <Icon name="back" size={18} /> Volver al checklist
       </Link>
       <div>
-        <NumBadge code={numeracion(a).code[r.id]} />
-        <span className="tag">{r.tema}</span>
-        <h2 style={{ marginTop: 6 }}>{r.titulo}</h2>
-        <p style={{ margin: "4px 0 0" }}>{r.detalle}</p>
+        <NumBadge code={code} />
+        <span className="tag">{obligation?.category ?? "Requisito"}</span>
+        <h2 style={{ marginTop: 6 }}>{v.title}</h2>
+        <p style={{ margin: "4px 0 0" }}>{v.body}</p>
       </div>
-      {r.rectificado && (
+      {v.amendmentNote && (
         <div className="alert warn">
           <div>
             <b>Actualizado por rectificación</b>
-            {r.rectificado}
+            {v.amendmentNote}
           </div>
         </div>
       )}
       <div className="sec-title">¿Cumple?</div>
       <div className="status-grid">
-        {MARCABLES.map((k) => (
+        {MARKABLE.map((k) => (
           <button
             key={k}
-            className={`st ${k} ${r.estado === k ? "on" : ""}`}
+            className={`st ${RESULT_CSS[k]} ${item.result === k || (k === "not_applicable" && naChoice) ? "on" : ""}`}
             disabled={ro}
             onClick={() => elegir(k)}
           >
-            <Dot estado={k} />
-            {ESTADOS[k]}
+            <Dot result={k} />
+            {RESULT_LABEL[k]}
           </button>
         ))}
       </div>
-      {r.estado === "na" && (
+      {showNa && (
         <div className="na-pick">
           <b className="small">¿Por qué no aplica?</b>
-          {!r.naMotivo && (
+          {!reason && (
             <span className="small" style={{ color: "var(--bad)" }}>
               {" "}
               Falta el motivo
             </span>
           )}
           <div className="chips">
-            {NA_MOTIVOS.map((m) => (
+            {NA_REASONS.map((m) => (
               <button
                 key={m}
-                className={r.naMotivo === m ? "on" : ""}
+                className={reason === m ? "on" : ""}
                 disabled={ro}
-                onClick={() =>
-                  void attempt(api.items.setNaReason(a.id, r.id, m)).then(
-                    (ok) => ok && toast("Motivo guardado"),
-                  )
-                }
+                onClick={() => elegirMotivo(m)}
               >
-                {m}
+                {NA_REASON_LABEL[m]}
               </button>
             ))}
           </div>
@@ -143,43 +189,51 @@ function Detalle({ reqId }: { reqId?: string }) {
         className={need ? "need" : ""}
         disabled={ro}
         placeholder="Describe lo observado en terreno…"
-        value={obs}
+        value={notes}
         onChange={(e) => {
-          setObsLocal(e.target.value);
+          setNotes(e.target.value);
           setNeed(false);
         }}
         onBlur={guardarObs}
       />
       <div className="sec-title">Evidencias</div>
-      <div className="small muted" style={{ margin: "-4px 2px 8px" }}>
-        Esperada: {r.evidencia}
-      </div>
+      {v.expectedEvidence && (
+        <div className="small muted" style={{ margin: "-4px 2px 8px" }}>
+          Esperada: {v.expectedEvidence}
+        </div>
+      )}
       <div className="stack">
-        {r.evidencias.length ? (
-          r.evidencias.map((e, i) => (
-            <div key={`${e.nombre}-${i}`} className="ev">
-              {e.thumb ? (
-                <img src={e.thumb} alt="" />
+        {item.evidence.length ? (
+          item.evidence.map((e) => (
+            <div key={e.id} className="ev">
+              {e.thumbUrl ? (
+                <img src={e.thumbUrl} alt="" />
               ) : (
                 <span className="ph">
-                  {(e.nombre.split(".").pop() || "DOC")
+                  {((e.filename ?? "").split(".").pop() || "DOC")
                     .toUpperCase()
                     .slice(0, 4)}
                 </span>
               )}
               <div className="grow small">
-                <b>{e.nombre}</b>
+                {e.fileUrl && e.fileUrl !== "#" ? (
+                  <a href={e.fileUrl} target="_blank" rel="noreferrer">
+                    <b>{e.filename ?? "Evidencia"}</b>
+                  </a>
+                ) : (
+                  <b>{e.filename ?? "Evidencia"}</b>
+                )}
                 <br />
                 <span className="muted">
-                  {fmtDate(e.fecha)} ·{" "}
-                  {e.sync ? "sincronizada" : "guardada en el teléfono"}
+                  {fmtDate(e.capturedAt)}
+                  {e.uploadedByName ? ` · ${e.uploadedByName}` : ""}
                 </span>
               </div>
               {!ro && (
                 <button
                   className="btn ghost sm"
                   aria-label="Quitar"
-                  onClick={() => void run(api.evidence.remove(a.id, r.id, i))}
+                  onClick={() => void run(actions.removeEvidence(a.id, e.id))}
                 >
                   <Icon name="x" size={16} />
                 </button>
@@ -192,46 +246,100 @@ function Detalle({ reqId }: { reqId?: string }) {
       </div>
       {!ro && (
         <div className="row">
-          <EvidenceButtons aid={a.id} rid={r.id} />
+          <EvidenceButtons auditId={a.id} itemId={item.id} />
         </div>
       )}
       <div className="sec-title">Información del requisito</div>
       <div className="card">
         <dl className="kv">
-          <dt>Fuente</dt>
-          <dd>
-            {d.tipo} {d.numero}
-          </dd>
-          <dt>Referencia</dt>
-          <dd>{r.fuente.ref}</dd>
+          <dt>Fiscaliza</dt>
+          <dd>{obligation?.authority.name ?? "—"}</dd>
           <dt>Frecuencia</dt>
-          <dd>{r.frecuencia}</dd>
+          <dd>{v.frequency ?? "—"}</dd>
           <dt>Vencimiento</dt>
           <dd>
-            {r.venc ? (
+            {v.dueDate ? (
               <>
-                {fmtDate(r.venc)} <DueTag venc={r.venc} />
+                {fmtDate(v.dueDate)} <DueTag due={v.dueDate} />
               </>
             ) : (
               "—"
             )}
           </dd>
           <dt>Validado por</dt>
-          <dd>{a.validador || "—"}</dd>
+          <dd>{v.validatedBy ?? "—"}</dd>
         </dl>
       </div>
+      <div className="sec-title">Fuente</div>
+      {v.sources.length ? (
+        v.sources.map((s, i) => (
+          <div key={i} className="card small">
+            <b>{s.documentNumber ?? "Documento"}</b> · {s.sectionKey}
+            {s.page ? ` · pág. ${s.page}` : ""}
+            {s.quote && (
+              <p className="muted" style={{ margin: "6px 0 0" }}>
+                “{s.quote}”
+              </p>
+            )}
+          </div>
+        ))
+      ) : (
+        <div className="small muted">
+          {obligation?.origin === "manual"
+            ? "Agregado manualmente (criterio del responsable)."
+            : "Sin fuente registrada."}
+        </div>
+      )}
       <div className="sec-title">Trazabilidad</div>
+      <Historial item={item} />
+    </div>
+  );
+}
+
+/**
+ * Línea de tiempo con lo que ya entrega el backend. El endpoint de historial
+ * completo está en desarrollo; cuando exista, se reemplaza esta función.
+ */
+function Historial({ item }: { item: AuditItem }) {
+  const v = item.version;
+  const events = [
+    { at: v.createdAt, what: "Requisito propuesto", who: "Sistema" },
+    v.validatedAt && {
+      at: v.validatedAt,
+      what: "Validado",
+      who: v.validatedBy ?? "",
+    },
+    ...item.evidence.map((e) => ({
+      at: e.createdAt,
+      what: `Evidencia agregada: ${e.filename ?? "archivo"}`,
+      who: e.uploadedByName ?? "",
+    })),
+    item.assessedAt && {
+      at: item.assessedAt,
+      what: `Marcado como “${RESULT_LABEL[item.result]}”`,
+      who: item.assessedByName ?? "",
+    },
+  ]
+    .filter((e): e is { at: string; what: string; who: string } => !!e)
+    .sort((x, y) => y.at.localeCompare(x.at));
+  return (
+    <>
       <div className="hist">
-        {[...r.hist].reverse().map((h, i) => (
+        {events.map((e, i) => (
           <div key={i}>
-            <b>{h.a}</b>
+            <b>{e.what}</b>
             <br />
             <span className="muted xs">
-              {new Date(h.f).toLocaleString("es-CL")} · {h.q}
+              {new Date(e.at).toLocaleString("es-CL")}
+              {e.who ? ` · ${e.who}` : ""}
             </span>
           </div>
         ))}
       </div>
-    </div>
+      <div className="xs muted">
+        El historial completo de cambios llegará con el próximo endpoint del
+        backend.
+      </div>
+    </>
   );
 }

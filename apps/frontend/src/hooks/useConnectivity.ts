@@ -1,25 +1,20 @@
 import { useEffect, useState } from "react";
-import { useAuditStore } from "../store/useAuditStore";
 import { toast } from "../store/useUiStore";
 
-/**
- * Los cambios siempre se guardan en el teléfono. Con conexión, se simula la
- * sincronización 1,5 s después del último cambio; sin conexión, quedan
- * pendientes hasta que vuelva la señal.
- */
+/** Si el dispositivo tiene conexión. */
 export function useConnectivity() {
   const [online, setOnline] = useState(() => navigator.onLine);
-  const pending = useAuditStore((s) => s.pending);
-  const markSynced = useAuditStore((s) => s.markSynced);
 
   useEffect(() => {
     const on = () => {
       setOnline(true);
-      toast("Conexión recuperada: sincronizando");
+      toast("Conexión recuperada");
     };
     const off = () => {
       setOnline(false);
-      toast("Sin conexión: los cambios se guardan en el teléfono");
+      toast(
+        "Sin conexión: los cambios no se guardarán hasta que vuelva la señal",
+      );
     };
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
@@ -29,11 +24,5 @@ export function useConnectivity() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!online || !pending) return;
-    const t = setTimeout(markSynced, 1500);
-    return () => clearTimeout(t);
-  }, [online, pending, markSynced]);
-
-  return { online, pending };
+  return online;
 }

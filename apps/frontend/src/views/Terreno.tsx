@@ -1,6 +1,7 @@
-import type { Auditoria, Requisito } from "@hackaton/contracts";
+import type { AuditDetail, AuditItem, NaReason } from "@hackaton/contracts";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { actions, attempt, run, type Undo } from "../api";
 import { EvidenceButtons } from "../components/EvidenceButtons";
 import { Icon } from "../components/Icon";
 import {
@@ -8,29 +9,30 @@ import {
   Dot,
   DueTag,
   Empty,
-  instById,
   Legend,
   NumBadge,
   ProgressBar,
 } from "../components/ui";
 import {
-  activeReqs,
-  docById,
-  numeracion,
-  ORDEN_ESTADO,
-  stats,
-  temasDe,
-} from "../domain/auditoria";
-import {
-  ESTADOS,
-  type EstadoMarcable,
-  MARCABLES,
-  NA_MOTIVOS,
-  NA_OTRO,
-} from "../domain/constants";
+  categoriesOf,
+  categoryLookup,
+  numberItems,
+  RESULT_ORDER,
+  type Row,
+  sourceLabel,
+  statsFromItems,
+} from "../domain/audit";
 import { fmtDate, pctLabel, plural } from "../domain/format";
+import {
+  MARKABLE,
+  type MarkableResult,
+  NA_REASON_LABEL,
+  NA_REASONS,
+  RESULT_CSS,
+  RESULT_LABEL,
+  RESULT_SHORT,
+} from "../domain/labels";
 import { useAuditCtx } from "../hooks/useAuditCtx";
-import { api, attempt, run, type Undo } from "../api";
 import { askConfirm, type Tab, toast, useUiStore } from "../store/useUiStore";
 
 /** Aviso con "Deshacer" (5 s) después de un cambio en terreno. */
@@ -41,21 +43,21 @@ function conDeshacer(msg: string, undo: Undo) {
   );
 }
 
-/** Marca un requisito desde la lista y ofrece deshacerlo. */
-async function evaluar(estado: string, r: Requisito, call: Promise<Undo>) {
+/** Marca un ítem desde la lista y ofrece deshacerlo. */
+async function evaluar(label: string, item: AuditItem, call: Promise<Undo>) {
   const undo = await run(call);
   if (!undo) return;
-  const t = r.titulo.length > 28 ? `${r.titulo.slice(0, 28)}…` : r.titulo;
-  conDeshacer(`${estado} · ${t}`, undo);
+  const t = item.version.title;
+  conDeshacer(`${label} · ${t.length > 28 ? `${t.slice(0, 28)}…` : t}`, undo);
 }
 
 /** Panel abierto bajo una fila: motivo de N/A o nota de No cumple. */
 type Picker = { id: string; tipo: "na" | "nota" } | null;
 
 export function Terreno() {
-  const a = useAuditCtx();
+  const { audit: a, obligations } = useAuditCtx();
   const navigate = useNavigate();
-  const { tab, q, setTab, setQ, setAdding } = useUiStore();
+  const { tab, q, setTab, setQ, setAdding, setStep } = useUiStore();
   const [picker, setPicker] = useState<Picker>(null);
   const filters = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -78,8 +80,8 @@ export function Terreno() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const closed = a.status === "cerrada";
-  if (a.status !== "publicada" && !closed) {
+  const closed = a.status === "closed";
+  if (a.status !== "published" && !closed) {
     return (
       <>
         <Crumb a={a} />
@@ -93,7 +95,11 @@ export function Terreno() {
     );
   }
 
-  const st = stats(activeReqs(a));
+  const { rows, categoryNumber } = numberItems(
+    a.items,
+    categoryLookup(obligations),
+  );
+  const st = statsFromItems(a.items);
   const cambiarTab = (t: Tab) => {
     setTab(t);
     setPicker(null);
@@ -120,15 +126,13 @@ export function Terreno() {
       <Crumb a={a} />
       <div>
         <h2>Trabajo en terreno</h2>
-        <div className="small muted">
-          {instById(a.inst)?.nombre} · {a.nombre}
-        </div>
+        <div className="small muted">{a.title}</div>
       </div>
       {closed && (
         <div className="alert info">
           <div>
-            <b>Auditoría cerrada el {fmtDate(a.cerrada)}</b>Solo lectura: puedes
-            revisar los resultados y evidencias.
+            <b>Auditoría cerrada el {fmtDate(a.closedAt)}</b>Solo lectura:
+            puedes revisar los resultados y evidencias.
           </div>
         </div>
       )}
@@ -136,7 +140,7 @@ export function Terreno() {
         <ProgressBar st={st} />
         <div className="row small" style={{ marginTop: 8 }}>
           <span className="grow muted">
-            {st.llenos}/{st.total} llenados
+            {st.filled}/{st.total} llenados
           </span>
           <span>
             <b>{pctLabel(st.pct)}</b> cumplimiento
@@ -156,8 +160,8 @@ export function Terreno() {
           {(
             [
               ["todos", `Todos · ${st.total}`],
-              ["done", `Llenados · ${st.llenos}`],
-              ["pend", `Pendientes · ${st.pendiente}`],
+              ["done", `Llenados · ${st.filled}`],
+              ["pend", `Pendientes · ${st.pending}`],
             ] as const
           ).map(([t, label]) => (
             <button
@@ -171,18 +175,24 @@ export function Terreno() {
         </div>
       </div>
       <div ref={list}>
-        <Lista a={a} tab={tab} q={q} picker={picker} setPicker={setPicker} />
+        <Lista
+          a={a}
+          rows={rows}
+          categoryNumber={categoryNumber}
+          tab={tab}
+          q={q}
+          picker={picker}
+          setPicker={setPicker}
+        />
       </div>
       {!closed && (
         <button
           className="btn block"
-          onClick={() =>
-            void attempt(api.audits.setStep(a.id, 4)).then((ok) => {
-              if (!ok) return;
-              setAdding(true);
-              void navigate("../preparar");
-            })
-          }
+          onClick={() => {
+            setStep(a.id, 4);
+            setAdding(true);
+            void navigate("../preparar");
+          }}
         >
           + Agregar requisito encontrado en terreno
         </button>
@@ -193,32 +203,35 @@ export function Terreno() {
 
 function Lista({
   a,
+  rows,
+  categoryNumber,
   tab,
   q,
   picker,
   setPicker,
 }: {
-  a: Auditoria;
+  a: AuditDetail;
+  rows: Row[];
+  categoryNumber: Record<string, number>;
   tab: Tab;
   q: string;
   picker: Picker;
   setPicker: (p: Picker) => void;
 }) {
-  const ro = a.status === "cerrada";
-  const num = numeracion(a);
+  const ro = a.status === "closed";
   const needle = q.trim().toLowerCase();
-  const list = activeReqs(a)
-    .filter((r) =>
+  const list = rows
+    .filter(({ item }) =>
       tab === "pend"
-        ? r.estado === "pendiente"
+        ? item.result === "pending"
         : tab === "done"
-          ? r.estado !== "pendiente"
+          ? item.result !== "pending"
           : true,
     )
     .filter(
-      (r) =>
+      ({ item, category }) =>
         !needle ||
-        `${r.titulo} ${r.tema} ${r.detalle} ${docById(r.fuente.doc, a).numero}`
+        `${item.version.title} ${category} ${item.version.body} ${sourceLabel(item.version)}`
           .toLowerCase()
           .includes(needle),
     );
@@ -237,20 +250,21 @@ function Lista({
     );
   }
 
-  return temasDe(list).map((t) => {
+  return categoriesOf(list).map((t) => {
     // Pendientes primero (para que se vean), luego Cumple, No cumple y al final N/A.
-    const items = list
-      .filter((r) => r.tema === t)
+    const group = list
+      .filter((r) => r.category === t)
       .sort(
         (x, y) =>
-          ORDEN_ESTADO[x.estado] - ORDEN_ESTADO[y.estado] ||
-          num.idx[x.id] - num.idx[y.id],
+          RESULT_ORDER[x.item.result] - RESULT_ORDER[y.item.result] ||
+          x.item.position - y.item.position,
       );
-    const pend = items.filter((r) => r.estado === "pendiente").length;
+    const pend = group.filter((r) => r.item.result === "pending").length;
+    const totalTema = rows.filter((r) => r.category === t).length;
     return (
       <details key={t} className="group" open>
         <summary>
-          <span className="t-num">{num.tema[t]}</span>
+          <span className="t-num">{categoryNumber[t]}</span>
           {t}
           {tab !== "done" && !ro && pend > 1 && (
             <button
@@ -259,10 +273,14 @@ function Lista({
                 e.preventDefault();
                 askConfirm({
                   titulo: `¿“${t}” no aplica?`,
-                  texto: `Se marcarán ${pend} requisitos pendientes como No aplica, con el motivo “${NA_MOTIVOS[0]}”. Podrás cambiar cada uno después.`,
+                  texto: `Se marcarán los ${totalTema} requisitos de esta temática como No aplica, con el motivo “${NA_REASON_LABEL.activity_not_performed}”. Podrás cambiar cada uno después.`,
                   ok: "Marcar No aplica",
                   onOk: () =>
-                    void run(api.items.categoryNotApplicable(a.id, t)).then(
+                    void run(
+                      actions.categoryNotApplicable(a, t, {
+                        naReason: "activity_not_performed",
+                      }),
+                    ).then(
                       (res) =>
                         res &&
                         conDeshacer(
@@ -278,23 +296,22 @@ function Lista({
           )}
           <span className="cnt small muted">
             {tab === "todos"
-              ? `${items.length - pend}/${items.length}`
-              : items.length}
+              ? `${group.length - pend}/${group.length}`
+              : group.length}
           </span>
         </summary>
-        {items.map((r) =>
-          r.estado === "pendiente" ? (
+        {group.map((r) =>
+          r.item.result === "pending" ? (
             <FilaPendiente
-              key={r.id}
+              key={r.item.id}
               a={a}
               r={r}
-              code={num.code[r.id]}
               ro={ro}
-              picker={picker?.id === r.id ? picker.tipo : null}
+              picker={picker?.id === r.item.id ? picker.tipo : null}
               setPicker={setPicker}
             />
           ) : (
-            <TarjetaMarcada key={r.id} a={a} r={r} code={num.code[r.id]} />
+            <TarjetaMarcada key={r.item.id} r={r} />
           ),
         )}
       </details>
@@ -302,35 +319,30 @@ function Lista({
   });
 }
 
-/** Requisito ya marcado: recuadro del color de su estado, sin botones. Se corrige en el detalle. */
-function TarjetaMarcada({
-  a,
-  r,
-  code,
-}: {
-  a: Auditoria;
-  r: Requisito;
-  code?: string;
-}) {
-  const n = r.evidencias.length;
+/** Ítem ya marcado: recuadro del color de su estado, sin botones. Se corrige en el detalle. */
+function TarjetaMarcada({ r }: { r: Row }) {
+  const { item } = r;
+  const n = item.evidence.length;
   const nota =
-    r.estado === "na"
-      ? r.naMotivo
-        ? `No aplica: ${r.naMotivo}`
+    item.result === "not_applicable"
+      ? item.naReason
+        ? `No aplica: ${NA_REASON_LABEL[item.naReason]}${item.notes ? ` · ${item.notes}` : ""}`
         : "Falta el motivo de No aplica"
-      : r.obs;
+      : item.notes;
   return (
-    <Link className={`item done ${r.estado}`} to={r.id}>
+    <Link className={`item done ${RESULT_CSS[item.result]}`} to={item.id}>
       <span className="grow">
         <span className="row" style={{ gap: 8, alignItems: "flex-start" }}>
           <span className="t grow">
-            <NumBadge code={code} />
-            {r.titulo}
+            <NumBadge code={r.code} />
+            {item.version.title}
           </span>
-          <span className="st-lbl">{ESTADOS[r.estado]}</span>
+          <span className="st-lbl">{RESULT_LABEL[item.result]}</span>
         </span>
         <span className="src">
-          {r.frecuencia} · {docById(r.fuente.doc, a).tipo}
+          {[item.version.frequency, sourceLabel(item.version)]
+            .filter(Boolean)
+            .join(" · ")}
           {n ? ` · ${plural(n, "evidencia")}` : ""}
         </span>
         {nota && <span className="d-note">{nota}</span>}
@@ -342,79 +354,76 @@ function TarjetaMarcada({
   );
 }
 
-const LBL: Record<EstadoMarcable, string> = {
-  cumple: "Cumple",
-  no_cumple: "No cumple",
-  na: "N/A",
-};
-
-/** Requisito pendiente: se marca con un toque sin abrirlo. */
+/** Ítem pendiente: se marca con un toque sin abrirlo. */
 function FilaPendiente({
   a,
   r,
-  code,
   ro,
   picker,
   setPicker,
 }: {
-  a: Auditoria;
-  r: Requisito;
-  code?: string;
+  a: AuditDetail;
+  r: Row;
   ro: boolean;
   picker: "na" | "nota" | null;
   setPicker: (p: Picker) => void;
 }) {
   const navigate = useNavigate();
+  const { item } = r;
   const extra = [
-    r.frecuencia,
-    docById(r.fuente.doc, a).tipo,
-    r.evidencias.length ? plural(r.evidencias.length, "evidencia") : "",
+    item.version.frequency,
+    sourceLabel(item.version),
+    item.evidence.length ? plural(item.evidence.length, "evidencia") : "",
   ]
     .filter(Boolean)
     .join(" · ");
 
-  const tocar = (k: EstadoMarcable) => {
-    if (k === "cumple") {
+  const tocar = (k: MarkableResult) => {
+    if (k === "compliant") {
       void evaluar(
-        ESTADOS.cumple,
-        r,
-        api.items.assess(a.id, r.id, { estado: "cumple" }),
+        RESULT_LABEL.compliant,
+        item,
+        actions.assess(a.id, a.facilityId, item, { result: "compliant" }),
       );
       return;
     }
-    const tipo = k === "na" ? "na" : "nota";
-    setPicker(picker === tipo ? null : { id: r.id, tipo });
+    const tipo = k === "not_applicable" ? "na" : "nota";
+    setPicker(picker === tipo ? null : { id: item.id, tipo });
   };
 
-  const elegirMotivo = (m: string) => {
+  const elegirMotivo = (m: NaReason) => {
     setPicker(null);
-    const call = api.items.assess(a.id, r.id, { estado: "na", naMotivo: m });
-    if (m === NA_OTRO) {
-      void attempt(call).then((ok) => {
-        if (!ok) return;
-        toast("Describe el motivo en la observación");
-        void navigate(r.id, { state: { focoObs: true } });
-      });
+    if (m === "other") {
+      // "Otro motivo" exige explicación: se completa en el detalle.
+      toast("Describe el motivo en la observación y elige «Otro motivo»");
+      void navigate(item.id, { state: { focoObs: true, naReason: "other" } });
       return;
     }
-    void evaluar(ESTADOS.na, r, call);
+    void evaluar(
+      RESULT_LABEL.not_applicable,
+      item,
+      actions.assess(a.id, a.facilityId, item, {
+        result: "not_applicable",
+        naReason: m,
+      }),
+    );
   };
 
   return (
     <div className="item q">
-      <Link className="q-top" to={r.id}>
-        <Dot estado={r.estado} />
+      <Link className="q-top" to={item.id}>
+        <Dot result={item.result} />
         <span className="grow">
           <span className="t">
-            <NumBadge code={code} />
-            {r.titulo}
+            <NumBadge code={r.code} />
+            {item.version.title}
           </span>
           <br />
           <span className="src">{extra}</span>
-          {r.venc && (
+          {item.version.dueDate && (
             <>
               <br />
-              <DueTag venc={r.venc} />
+              <DueTag due={item.version.dueDate} />
             </>
           )}
         </span>
@@ -423,16 +432,16 @@ function FilaPendiente({
         </span>
       </Link>
       <div className="q-btns">
-        {MARCABLES.map((k) => (
+        {MARKABLE.map((k) => (
           <button
             key={k}
-            className={k}
+            className={RESULT_CSS[k]}
             disabled={ro}
             aria-pressed={false}
             onClick={() => tocar(k)}
           >
-            <Dot estado={k} />
-            {LBL[k]}
+            <Dot result={k} />
+            {RESULT_SHORT[k]}
           </button>
         ))}
       </div>
@@ -445,16 +454,16 @@ function FilaPendiente({
             </button>
           </div>
           <div className="chips">
-            {NA_MOTIVOS.map((m) => (
+            {NA_REASONS.map((m) => (
               <button key={m} onClick={() => elegirMotivo(m)}>
-                {m}
+                {NA_REASON_LABEL[m]}
               </button>
             ))}
           </div>
         </div>
       )}
       {picker === "nota" && (
-        <NotaNoCumple a={a} r={r} onClose={() => setPicker(null)} />
+        <NotaNoCumple a={a} item={item} onClose={() => setPicker(null)} />
       )}
     </div>
   );
@@ -463,20 +472,20 @@ function FilaPendiente({
 /** No cumple exige una nota: un hallazgo sin descripción no sirve en la auditoría. La evidencia es opcional. */
 function NotaNoCumple({
   a,
-  r,
+  item,
   onClose,
 }: {
-  a: Auditoria;
-  r: Requisito;
+  a: AuditDetail;
+  item: AuditItem;
   onClose: () => void;
 }) {
-  const [nota, setNota] = useState(r.obs);
+  const [nota, setNota] = useState(item.notes ?? "");
   const [need, setNeed] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     ref.current?.focus();
   }, []);
-  const n = r.evidencias.length;
+  const n = item.evidence.length;
 
   const guardar = () => {
     const t = nota.trim();
@@ -488,16 +497,19 @@ function NotaNoCumple({
     }
     onClose();
     void evaluar(
-      ESTADOS.no_cumple,
-      r,
-      api.items.assess(a.id, r.id, { estado: "no_cumple", obs: t }),
+      RESULT_LABEL.non_compliant,
+      item,
+      actions.assess(a.id, a.facilityId, item, {
+        result: "non_compliant",
+        notes: t,
+      }),
     );
   };
 
   return (
     <div className="na-pick stack">
       <div className="row small">
-        <Dot estado="no_cumple" />
+        <Dot result="non_compliant" />
         <b className="grow">
           No cumple: ¿qué observaste?{" "}
           <span style={{ color: "var(--bad)" }}>*</span>
@@ -515,7 +527,7 @@ function NotaNoCumple({
         }}
       />
       <div className="row wrap small">
-        <EvidenceButtons aid={a.id} rid={r.id} small />
+        <EvidenceButtons auditId={a.id} itemId={item.id} small />
         <span className="muted grow">
           {n ? plural(n, "evidencia") : "Evidencia opcional"}
         </span>
